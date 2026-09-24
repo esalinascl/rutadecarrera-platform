@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "env": {
+    "GEMINI_API_KEY": "@gemini_api_key",
+    "DATABASE_URL": "@database_url",
+    "NEXT_PUBLIC_APP_URL": "@next_public_app_url",
+    "NODE_ENV": "production"
+  },
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "develop": true
+    }
+  },
+  "regions": ["sfo1", "gru1"],
+  "functions": {
+    "apps/asistente/api/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  }
+}

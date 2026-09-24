@@ -1,0 +1,28 @@
+{
+  "name": "rutadecarrera-platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@8",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "build": "pnpm -r build",
+    "test": "jest --workspaces",
+    "test:watch": "jest --workspaces --watch",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "typecheck": "tsc --noEmit --workspaces",
+    "format": "prettier --write .",
+    "ci": "pnpm lint && pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
+  }
+}
