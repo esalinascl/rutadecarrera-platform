@@ -1,0 +1,61 @@
+{
+  "name": "@rutadecarrera/shared",
+  "version": "0.1.0",
+  "description": "Tipos compartidos y utilidades para el Asistente de Empleabilidad",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./types": {
+      "import": "./dist/types/index.js",
+      "require": "./dist/types/index.cjs"
+    },
+    "./utils": {
+      "import": "./dist/utils/index.js",
+      "require": "./dist/utils/index.cjs"
+    },
+    "./utils/validation": {
+      "import": "./dist/utils/validation.js",
+      "require": "./dist/utils/validation.cjs"
+    },
+    "./utils/gemini": {
+      "import": "./dist/utils/gemini.js",
+      "require": "./dist/utils/gemini.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.22.0",
+    "@google/generative-ai": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  },
+  "keywords": [
+    "tipos",
+    "utilidades",
+    "asistente",
+    "empleabilidad",
+    "gemini"
+  ],
+  "author": "Eduardo Salinas Belletti",
+  "license": "MIT"
+}
