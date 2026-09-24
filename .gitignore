@@ -44,9 +44,12 @@ dist/
 # Vercel
 .vercel/
 
-# pnpm
-pnpm-lock.yaml
+# Lock files
+# pnpm-lock.yaml SE COMMITEA: garantiza las mismas versiones en ambos
+# computadores y en CI (`pnpm install --frozen-lockfile`).
+# Los lockfiles de otros gestores se ignoran: este repo usa solo pnpm.
+package-lock.json
+yarn.lock
 
-# Lock files (optional - uncomment if using one package manager)
-# package-lock.json
-# yarn.lock
+# Reportes de cobertura (se generan con pnpm test:coverage)
+coverage/

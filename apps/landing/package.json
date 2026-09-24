@@ -3,33 +3,18 @@
   "version": "0.1.0",
   "description": "Landing page de Ruta de Carrera Platform",
   "private": true,
-  "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint . --ext .ts,.tsx",
-    "lint:fix": "eslint . --ext .ts,.tsx --fix",
-    "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "clean": "rm -rf .next out dist node_modules"
-  },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "next": "^14.0.0"
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "next": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "typescript": "^5.0.0",
-    "eslint": "^8.0.0",
-    "eslint-config-next": "^14.0.0",
-    "prettier": "^3.0.0",
-    "jest": "^29.0.0",
-    "@testing-library/react": "^14.0.0"
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:",
+    "prettier": "catalog:"
   }
 }

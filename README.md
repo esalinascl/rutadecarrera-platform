@@ -14,12 +14,13 @@ Plataforma integral de empleabilidad y carrera profesional. Un asistente intelig
 
 | Componente | Tecnología |
 |-----------|-----------|
-| **Frontend** | Next.js 14+, React, TypeScript |
+| **Frontend** | Next.js 16, React 18, TypeScript |
 | **Backend/API** | Next.js API Routes |
 | **IA** | Google Gemini API |
-| **Base de Datos** | (Por definir - Firestore/PostgreSQL) |
-| **Autenticación** | (Por definir - Auth0/Firebase) |
-| **Monorepo** | pnpm workspaces |
+| **Base de Datos** | PostgreSQL (Supabase), Row Level Security activado |
+| **Autenticación** | Supabase Auth (TASK 9) |
+| **Monorepo** | pnpm 12 workspaces + catálogo de versiones |
+| **Tests** | Vitest 5 (cobertura mínima 80%) |
 | **CI/CD** | GitHub Actions |
 | **Hosting** | Vercel |
 
@@ -50,22 +51,18 @@ rutadecarrera-platform/
 │       └── lib/
 │
 ├── packages/                       # Paquetes compartidos
-│   └── shared/
-│       ├── db/                     # Esquemas y queries de DB
-│       │   ├── schema.ts
-│       │   ├── client.ts
-│       │   └── migrations/
-│       │
-│       ├── types/                  # Tipos compartidos de TypeScript
-│       │   ├── user.ts
-│       │   ├── assessment.ts
-│       │   ├── career.ts
-│       │   └── index.ts
-│       │
-│       └── utils/                  # Utilidades comunes
-│           ├── validation.ts
-│           ├── formatting.ts
-│           └── index.ts
+│   └── shared/                     # UN solo paquete: @rcp/shared
+│       └── src/
+│           ├── db/                 # SOLO SERVIDOR (@rcp/shared/db)
+│           │   ├── migrations/     # 001_init_schema.sql = fuente de verdad del esquema
+│           │   ├── schema.ts       # Columnas por tabla + contratos de repositorios
+│           │   └── client.ts       # Cliente Supabase (service role) + repositorios
+│           ├── types/index.ts      # Entidades (reflejan las tablas) y contratos de API
+│           ├── utils/
+│           │   ├── validation.ts   # Esquemas Zod atados a los tipos (satisfies)
+│           │   ├── gemini.ts       # Cliente Gemini (timeout, API key en header)
+│           │   └── index.ts        # Utilidades generales
+│           └── __tests__/          # 156 tests Vitest
 │
 ├── docs/                           # Documentación
 │   ├── setup.md                    # Instrucciones de instalación
@@ -89,50 +86,34 @@ rutadecarrera-platform/
 
 ## 🚀 Inicio Rápido
 
-### Requisitos
-- Node.js 18+
-- pnpm 8+ (recomendado) o npm 8+
-- Git
-
-### Instalación
+Requisitos: **Node 24** (`.nvmrc`) y **pnpm 12.6** (fijado en `packageManager`). Solo pnpm, nunca npm ni yarn.
 
 ```bash
-# Clonar repositorio
-git clone https://github.com/esalinascl/rutadecarrera-platform.git
+git clone git@github.com:esalinascl/rutadecarrera-platform.git
 cd rutadecarrera-platform
+nvm use && corepack enable
+pnpm install --frozen-lockfile
+cp .env.example .env.local   # completar con claves de STAGING
 
-# Instalar dependencias
-pnpm install
-
-# O si uses npm
-npm install
+pnpm test        # 156 tests (Vitest)
+pnpm typecheck   # TypeScript
 ```
 
-### Desarrollo
+Guía completa (incluye trabajo con dos computadores): [docs/setup.md](docs/setup.md).
 
-```bash
-# Iniciar todos los proyectos en modo desarrollo
-pnpm run dev
+### ⚠️ Variables de entorno: regla de seguridad
 
-# O ejecutar un workspace específico
-pnpm run dev --filter=@rcp/asistente
+- Las claves secretas (`GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) **nunca** llevan prefijo `NEXT_PUBLIC_`: ese prefijo las publica en el navegador de cualquier visitante.
+- `.env.local` nunca se commitea. El único archivo de ejemplo es `.env.example` en la raíz.
 
-# Ejecutar tests
-pnpm run test
+## 🛡️ Gobernanza
 
-# Linting
-pnpm run lint
-```
+Este repo sigue reglas obligatorias para trabajo con varios agentes y computadores:
 
-### Variables de Entorno
-
-Crear archivos `.env.local` en cada app:
-
-```bash
-# apps/asistente/.env.local
-NEXT_PUBLIC_GEMINI_API_KEY=<tu-api-key>
-DATABASE_URL=<url-base-datos>
-```
+- Toda rama nace de `origin/main` actualizado: `git fetch && git switch -c feat/x origin/main`.
+- `main` protegido: solo se modifica por Pull Request con CI en verde.
+- CI que bloquea de verdad: tests, typecheck y cobertura mínima de 80%.
+- Nunca dos computadores trabajando en la misma rama.
 
 ## 📚 Documentación
 
