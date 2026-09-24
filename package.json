@@ -13,6 +13,7 @@
     "test": "pnpm -r run test",
     "test:coverage": "pnpm -r run test:coverage",
     "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
     "prepare": "husky install"
   },
   "engines": {
@@ -25,6 +26,8 @@
     "prettier": "catalog:",
     "eslint": "catalog:",
     "husky": "^8.0.0",
-    "lint-staged": "^15.0.0"
+    "lint-staged": "^15.0.0",
+    "@eslint/js": "catalog:",
+    "typescript-eslint": "catalog:"
   }
 }
