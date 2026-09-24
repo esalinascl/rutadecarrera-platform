@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS mensajes (
   conversacion_id UUID NOT NULL REFERENCES conversaciones(id) ON DELETE CASCADE,
   rol             VARCHAR(20) NOT NULL CHECK (rol IN ('user', 'assistant')),
   contenido       TEXT NOT NULL,
-  tokens_usage    INTEGER CHECK (tokens_usage IS NULL OR tokens_usage >= 0),
+  tokens_used     INTEGER CHECK (tokens_usage IS NULL OR tokens_usage >= 0),
   creado_en       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
