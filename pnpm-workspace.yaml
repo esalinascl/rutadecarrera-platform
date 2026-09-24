@@ -1,0 +1,11 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'packages/*/packages/*'
+
+catalog:
+  next: ^14.0.0
+  react: ^18.2.0
+  typescript: ^5.0.0
+  prettier: ^3.0.0
+  eslint: ^8.0.0
