@@ -1,12 +1,85 @@
 /**
  * Módulo de Base de Datos
- * Gestión centralizada de conexiones y esquemas
+ * Gestión centralizada de conexiones, esquemas e interfaces de BD
  *
- * Nota: Esta es una estructura inicial
- * Los esquemas y migraciones se agregarán en futuras fases
+ * Proyecto: Asistente de Empleabilidad
+ * Versión: 1.0
  */
 
 import { User, Assessment, CareerPath } from '@rcp/types';
+
+// ============================================================================
+// TIPOS PARA ASISTENTE DE EMPLEABILIDAD
+// ============================================================================
+
+/**
+ * Usuario del asistente de empleabilidad
+ * Almacena datos de perfil y contexto inicial
+ */
+export interface UsuarioDB {
+  id: string;
+  email: string;
+  nombre: string;
+  profesion?: string;
+  objetivo_profesional?: string;
+  contexto_inicial?: Record<string, any>;
+  creado_en: Date;
+  actualizado_en: Date;
+}
+
+/**
+ * Conversación entre usuario y asistente
+ */
+export interface ConversacionDB {
+  id: string;
+  usuario_id: string;
+  titulo?: string;
+  creado_en: Date;
+  actualizado_en: Date;
+}
+
+/**
+ * Mensaje individual en una conversación
+ */
+export interface MensajeDB {
+  id: string;
+  conversacion_id: string;
+  rol: 'user' | 'assistant';
+  contenido: string;
+  tokens_usage?: number;
+  creado_en: Date;
+}
+
+/**
+ * Análisis de empleabilidad generado por el sistema
+ */
+export interface AnalisisDB {
+  id: string;
+  usuario_id: string;
+  tipo?: string;
+  resultado?: Record<string, any>;
+  creado_en: Date;
+}
+
+// ============================================================================
+// TIPOS PARA CREACIÓN Y ACTUALIZACIÓN
+// ============================================================================
+
+export type UsuarioCreate = Omit<UsuarioDB, 'id' | 'creado_en' | 'actualizado_en'>;
+export type UsuarioUpdate = Partial<Omit<UsuarioDB, 'id' | 'creado_en'>>;
+
+export type ConversacionCreate = Omit<ConversacionDB, 'id' | 'creado_en' | 'actualizado_en'>;
+export type ConversacionUpdate = Partial<Omit<ConversacionDB, 'id' | 'usuario_id' | 'creado_en'>>;
+
+export type MensajeCreate = Omit<MensajeDB, 'id' | 'creado_en'>;
+export type MensajeUpdate = Partial<Omit<MensajeDB, 'id' | 'conversacion_id' | 'creado_en'>>;
+
+export type AnalisisCreate = Omit<AnalisisDB, 'id' | 'creado_en'>;
+export type AnalisisUpdate = Partial<Omit<AnalisisDB, 'id' | 'usuario_id' | 'creado_en'>>;
+
+// ============================================================================
+// INTERFACES DE REPOSITORIOS
+// ============================================================================
 
 /**
  * Interfaz para el cliente de base de datos
@@ -20,62 +93,108 @@ export interface DatabaseClient {
 /**
  * Interfaz para operaciones CRUD de Usuario
  */
-export interface UserRepository {
-  create(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User>;
-  findById(id: string): Promise<User | null>;
-  findByEmail(email: string): Promise<User | null>;
-  update(id: string, data: Partial<User>): Promise<User>;
+export interface UsuarioRepository {
+  create(usuario: UsuarioCreate): Promise<UsuarioDB>;
+  findById(id: string): Promise<UsuarioDB | null>;
+  findByEmail(email: string): Promise<UsuarioDB | null>;
+  update(id: string, data: UsuarioUpdate): Promise<UsuarioDB>;
   delete(id: string): Promise<boolean>;
 }
 
 /**
- * Interfaz para operaciones CRUD de Assessment
+ * Interfaz para operaciones CRUD de Conversación
  */
-export interface AssessmentRepository {
-  create(assessment: Omit<Assessment, 'id'>): Promise<Assessment>;
-  findById(id: string): Promise<Assessment | null>;
-  findByUserId(userId: string): Promise<Assessment[]>;
-  update(id: string, data: Partial<Assessment>): Promise<Assessment>;
+export interface ConversacionRepository {
+  create(conversacion: ConversacionCreate): Promise<ConversacionDB>;
+  findById(id: string): Promise<ConversacionDB | null>;
+  findByUsuarioId(usuario_id: string): Promise<ConversacionDB[]>;
+  update(id: string, data: ConversacionUpdate): Promise<ConversacionDB>;
   delete(id: string): Promise<boolean>;
 }
 
 /**
- * Interfaz para operaciones CRUD de CareerPath
+ * Interfaz para operaciones CRUD de Mensaje
  */
-export interface CareerPathRepository {
-  create(careerPath: Omit<CareerPath, 'id'>): Promise<CareerPath>;
-  findById(id: string): Promise<CareerPath | null>;
-  findByUserId(userId: string): Promise<CareerPath | null>;
-  update(id: string, data: Partial<CareerPath>): Promise<CareerPath>;
+export interface MensajeRepository {
+  create(mensaje: MensajeCreate): Promise<MensajeDB>;
+  findById(id: string): Promise<MensajeDB | null>;
+  findByConversacionId(conversacion_id: string): Promise<MensajeDB[]>;
+  update(id: string, data: MensajeUpdate): Promise<MensajeDB>;
   delete(id: string): Promise<boolean>;
 }
 
 /**
- * Inicializa la conexión a la base de datos
- * Se implementará con la BD elegida (PostgreSQL, Firestore, etc)
+ * Interfaz para operaciones CRUD de Análisis
  */
-export async function initializeDatabase(): Promise<DatabaseClient> {
-  // TODO: Implementar conexión según BD elegida
-  throw new Error('Database not configured yet');
+export interface AnalisisRepository {
+  create(analisis: AnalisisCreate): Promise<AnalisisDB>;
+  findById(id: string): Promise<AnalisisDB | null>;
+  findByUsuarioId(usuario_id: string): Promise<AnalisisDB[]>;
+  update(id: string, data: AnalisisUpdate): Promise<AnalisisDB>;
+  delete(id: string): Promise<boolean>;
 }
 
-/**
- * Estructura de esquema para referencia
- */
+// ============================================================================
+// ESQUEMA DE BASE DE DATOS (Referencia)
+// ============================================================================
+
 export const DATABASE_SCHEMA = {
-  users: {
-    tableName: 'users',
-    columns: ['id', 'email', 'name', 'avatar', 'createdAt', 'updatedAt'],
+  usuarios: {
+    tableName: 'usuarios',
+    columns: [
+      'id',
+      'email',
+      'nombre',
+      'profesion',
+      'objetivo_profesional',
+      'contexto_inicial',
+      'creado_en',
+      'actualizado_en',
+    ],
+    primaryKey: 'id',
+    uniqueKeys: ['email'],
   },
-  assessments: {
-    tableName: 'assessments',
-    columns: ['id', 'userId', 'type', 'score', 'results', 'completedAt'],
+  conversaciones: {
+    tableName: 'conversaciones',
+    columns: ['id', 'usuario_id', 'titulo', 'creado_en', 'actualizado_en'],
+    primaryKey: 'id',
+    foreignKeys: { usuario_id: 'usuarios.id' },
   },
-  careerPaths: {
-    tableName: 'career_paths',
-    columns: ['id', 'userId', 'currentRole', 'targetRole', 'milestones', 'recommendations', 'updatedAt'],
+  mensajes: {
+    tableName: 'mensajes',
+    columns: ['id', 'conversacion_id', 'rol', 'contenido', 'tokens_usage', 'creado_en'],
+    primaryKey: 'id',
+    foreignKeys: { conversacion_id: 'conversaciones.id' },
+  },
+  analisis: {
+    tableName: 'analisis',
+    columns: ['id', 'usuario_id', 'tipo', 'resultado', 'creado_en'],
+    primaryKey: 'id',
+    foreignKeys: { usuario_id: 'usuarios.id' },
   },
 } as const;
 
+// ============================================================================
+// INICIALIZACIÓN
+// ============================================================================
+
+/**
+ * Inicializa la conexión a la base de datos
+ * Se implementará con Supabase (PostgreSQL)
+ */
+export async function initializeDatabase(): Promise<DatabaseClient> {
+  // TODO: Implementar conexión a Supabase en packages/shared/db/client.ts
+  throw new Error('Database not configured yet');
+}
+
+// ============================================================================
+// EXPORTACIONES
+// ============================================================================
+
 export type { User, Assessment, CareerPath };
-export type { UserRepository, AssessmentRepository, CareerPathRepository };
+export type {
+  UsuarioRepository,
+  ConversacionRepository,
+  MensajeRepository,
+  AnalisisRepository,
+};
