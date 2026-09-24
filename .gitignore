@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Environment variables
+.env.local
+.env.*.local
+.env
+.env.production
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.nuxt/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+*.swp
+*.swo
+*~
+.editorconfig
+
+# Testing
+coverage/
+.nyc_output/
+
+# Optional npm cache
+.npm
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel/
+
+# Misc
+*.pem
