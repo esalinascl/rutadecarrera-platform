@@ -3,41 +3,28 @@
   "version": "0.1.0",
   "description": "Plataforma integral de empleabilidad y carrera profesional con asistente inteligente Gemini",
   "private": true,
+  "packageManager": "pnpm@12.6.0",
   "license": "MIT",
   "author": {
     "name": "Eduardo Salinas Belletti",
     "email": "eduardo.salinasb@gmail.com"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel run dev",
-    "build": "pnpm -r run build",
     "test": "pnpm -r run test",
-    "test:watch": "pnpm -r run test:watch",
     "test:coverage": "pnpm -r run test:coverage",
-    "lint": "pnpm -r run lint",
-    "lint:fix": "pnpm -r run lint:fix",
-    "format": "pnpm -r run format",
-    "format:check": "pnpm -r run format:check",
     "typecheck": "pnpm -r run typecheck",
-    "clean": "pnpm -r run clean && pnpm clean",
     "prepare": "husky install"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
+    "node": ">=22.12.0",
+    "pnpm": ">=12.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "prettier": "^3.0.0",
-    "eslint": "^8.0.0",
-    "eslint-config-next": "^14.0.0",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "prettier": "catalog:",
+    "eslint": "catalog:",
     "husky": "^8.0.0",
     "lint-staged": "^15.0.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "typescript": "^5.0.0"
-    }
   }
 }
