@@ -432,19 +432,36 @@ const PATRONES_DE_SECRETOS: ReadonlyArray<RegExp> = [
   /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, // JWT (ej. claves de Supabase)
 ];
 
-/** Valor escrito a continuación de una etiqueta sensible: "token: abc", "password=xyz". */
+/** Valor escrito a continuación de una etiqueta sensible: "token: abc1", "password=xyz9". */
 const VALOR_ETIQUETADO =
   /\b(api[ _-]?key|token|secret|password|contraseña|clave)(\s*[:=]\s*)([^\s,;]+)/gi;
+
+/**
+ * Decide si el valor que sigue a una etiqueta tiene forma de secreto.
+ *
+ * En español "clave:" o "token:" aparecen en texto normal de coaching
+ * ("Punto clave: constancia"). Un secreto real casi siempre contiene
+ * dígitos o es una cadena larga sin espacios; una palabra común no.
+ */
+function pareceSecreto(valor: string): boolean {
+  const limpio = valor.replace(/[.!?)]+$/, '');
+  return /\d/.test(limpio) || limpio.length >= 16;
+}
 
 /**
  * Oculta secretos en un texto reemplazando sus valores por "[REDACTED]".
  *
  * @example
- * ocultarSecretos('Tu API key: sk-12345') // 'Tu API key: [REDACTED]'
- * ocultarSecretos('Diseña una API REST')  // sin cambios
+ * ocultarSecretos('Tu API key: sk-12345')       // 'Tu API key: [REDACTED]'
+ * ocultarSecretos('Punto clave: constancia.')  // sin cambios
+ * ocultarSecretos('Diseña una API REST')        // sin cambios
  */
 export function ocultarSecretos(texto: string): string {
-  const sinEtiquetados = texto.replace(VALOR_ETIQUETADO, '$1$2[REDACTED]');
+  const sinEtiquetados = texto.replace(
+    VALOR_ETIQUETADO,
+    (coincidencia, etiqueta: string, separador: string, valor: string) =>
+      pareceSecreto(valor) ? `${etiqueta}${separador}[REDACTED]` : coincidencia,
+  );
   return PATRONES_DE_SECRETOS.reduce(
     (acumulado, patron) => acumulado.replace(patron, '[REDACTED]'),
     sinEtiquetados,

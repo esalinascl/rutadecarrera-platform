@@ -3,7 +3,7 @@
 Guía para dejar el proyecto funcionando en **cualquier computador** con las mismas
 versiones exactas que el CI. Si trabajas en dos máquinas, sigue esta guía en ambas.
 
-> Reglas del proyecto: [`REGLA — Gobernanza Multi-Agente de Desarrollo`](../README.md#gobernanza)
+> Reglas del proyecto: sección **Gobernanza** del [README](../README.md)
 > (fuente de verdad = GitHub, ramas desde `origin/main`, nunca dos máquinas en la misma rama).
 
 ---
@@ -18,12 +18,24 @@ versiones exactas que el CI. Si trabajas en dos máquinas, sigue esta guía en a
 
 Solo **pnpm**. No uses `npm install` ni `yarn`: generarían otro lockfile y versiones distintas.
 
+Node 24, con **una** de estas opciones:
+
 ```bash
-# Node con nvm (usa la versión del .nvmrc)
+# Opción A: nvm (lee el .nvmrc)
 nvm install && nvm use
 
-# pnpm en la versión exacta del proyecto (viene con Node)
-corepack enable
+# Opción B: Homebrew (macOS), si no usas nvm
+brew install node@24 && brew link --overwrite node@24
+
+# Verificar
+node -v   # debe decir v24.x (o al menos v22.12)
+```
+
+pnpm en la versión exacta del proyecto (no dependas de `corepack`: las versiones recientes de Node ya no lo incluyen):
+
+```bash
+npm install -g pnpm@12.6.0   # o: brew install pnpm
+pnpm -v                      # debe decir 12.6.0
 ```
 
 ## 2. Clonar e instalar
@@ -73,13 +85,15 @@ git switch -c feat/descripcion-corta origin/main   # SIEMPRE desde origin/main
 | Paquete | Estado |
 |---|---|
 | `packages/shared` (`@rcp/shared`) | ✅ Tipos, validación (Zod), cliente de base de datos, utilidades Gemini. Con tests. |
-| `apps/landing`, `apps/asistente`, `apps/test-disc` | ⏳ Solo `package.json`. Cada app Next.js se crea en su TASK (11 en adelante). Por eso aún no tienen `dev`, `build` ni `test`. |
+| `apps/landing`, `apps/asistente`, `apps/test-disc` | ⏳ Solo `package.json`. Cada app Next.js se crea en su TASK (11 en adelante). Por eso aún no existen `pnpm dev`, `pnpm build` ni `pnpm lint`: se agregan cuando haya algo que ejecutar. |
+
+Al crear cada app (TASK 11+), su `next.config` debe incluir `transpilePackages: ['@rcp/shared']`, porque el paquete compartido se consume directo desde su código TypeScript.
 
 ## Problemas frecuentes
 
 | Síntoma | Causa | Solución |
 |---|---|---|
 | `ERR_PNPM_FROZEN_LOCKFILE` | `package.json` cambió sin lockfile | Quien hizo el cambio debe commitear `pnpm-lock.yaml` |
-| `Unsupported engine` | Node menor a 22.12 | `nvm use` |
-| Vitest pide otra versión de Node | Node desactualizado | `nvm install && nvm use` |
+| `Unsupported engine` | Node menor a 22.12 | Instalar Node 24 (ver sección 1) |
+| Vitest pide otra versión de Node | Node desactualizado | Instalar Node 24 (ver sección 1) |
 | `Permission denied (publickey)` al hacer `git fetch` | La llave SSH no está cargada | `ssh-add --apple-use-keychain ~/.ssh/id_ed25519` (macOS) |

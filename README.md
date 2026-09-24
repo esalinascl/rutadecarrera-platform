@@ -62,7 +62,7 @@ rutadecarrera-platform/
 │           │   ├── validation.ts   # Esquemas Zod atados a los tipos (satisfies)
 │           │   ├── gemini.ts       # Cliente Gemini (timeout, API key en header)
 │           │   └── index.ts        # Utilidades generales
-│           └── __tests__/          # 156 tests Vitest
+│           └── __tests__/          # Tests Vitest
 │
 ├── docs/                           # Documentación
 │   ├── setup.md                    # Instrucciones de instalación
@@ -91,11 +91,11 @@ Requisitos: **Node 24** (`.nvmrc`) y **pnpm 12.6** (fijado en `packageManager`).
 ```bash
 git clone git@github.com:esalinascl/rutadecarrera-platform.git
 cd rutadecarrera-platform
-nvm use && corepack enable
+# Node 24 y pnpm 12.6.0 instalados (ver docs/setup.md)
 pnpm install --frozen-lockfile
 cp .env.example .env.local   # completar con claves de STAGING
 
-pnpm test        # 156 tests (Vitest)
+pnpm test        # tests (Vitest)
 pnpm typecheck   # TypeScript
 ```
 

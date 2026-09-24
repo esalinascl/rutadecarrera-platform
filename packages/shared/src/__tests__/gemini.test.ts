@@ -13,6 +13,7 @@ import {
   estimateProcessingTime,
   getDefaultGeminiConfig,
   sanitizeGeminiResponse,
+  ocultarSecretos,
 } from '../utils/gemini';
 import type { GeminiMessage, Message, ContextoInicial } from '../types';
 
@@ -430,6 +431,30 @@ describe('Gemini - Utility Functions', () => {
       const response = { response: texto, tokensUsed: 10, model: 'gemini-pro' };
 
       expect(sanitizeGeminiResponse(response).response).toBe(texto);
+    });
+
+    // Encontrado en la revisión del PR #5: "etiqueta: palabra" es muy común en
+    // español y la versión anterior censuraba la palabra.
+    it.each([
+      'Punto clave: constancia en tu búsqueda.',
+      'La clave: practicar entrevistas cada semana.',
+      'Palabra clave: liderazgo.',
+      'Token: unidad mínima de texto que procesa un modelo.',
+      'Secret: no hay atajos, solo práctica.',
+    ])('NO altera la frase de coaching "%s"', (frase) => {
+      expect(ocultarSecretos(frase)).toBe(frase);
+    });
+
+    it.each([
+      ['password: hunter2', 'hunter2'],
+      ['contraseña: Chile2026', 'Chile2026'],
+      ['api key: AIzaSyD123', 'AIzaSyD123'],
+      ['token=abc123', 'abc123'],
+      ['secret: kQ7pZ2xL9mN4vB8wR1tY', 'kQ7pZ2xL9mN4vB8wR1tY'],
+    ])('oculta el valor en "%s"', (texto, secreto) => {
+      const resultado = ocultarSecretos(texto);
+      expect(resultado).toContain('[REDACTED]');
+      expect(resultado).not.toContain(secreto);
     });
 
     it('debe preservar respuesta normal', () => {
