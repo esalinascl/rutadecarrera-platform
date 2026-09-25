@@ -164,6 +164,9 @@ settings:
 
 catalogs:
   default:
+    '@eslint/js':
+      specifier: ^9.39.5
+      version: 9.39.5
     '@types/node':
       specifier: ^24.0.0
       version: 24.13.6
@@ -194,11 +197,17 @@ catalogs:
     typescript:
       specifier: ^5.0.0
       version: 5.9.3
+    typescript-eslint:
+      specifier: ^8.70.1
+      version: 8.70.1
 
 importers:
 
   .:
     devDependencies:
+      '@eslint/js':
+        specifier: 'catalog:'
+        version: 9.39.5
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.6
@@ -217,6 +226,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      typescript-eslint:
+        specifier: 'catalog:'
+        version: 8.70.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@5.9.3)
 
   apps/asistente:
     dependencies:

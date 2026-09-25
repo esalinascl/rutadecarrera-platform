@@ -1,44 +1,31 @@
-## 📝 Descripción
+## Qué y por qué
 
-Explica brevemente qué cambios incluye este PR y por qué.
+<!-- 2-3 líneas. Enlaza la TASK o la sección de la SPEC. -->
 
-Cierra: #ISSUE_NUMBER (si aplica)
+TASK:
 
-## 🎯 Tipo de Cambio
+## Lo verifica el CI automáticamente (no marcar a mano)
 
-- [ ] Bug fix (cambio que repara un problema)
-- [ ] Feature (funcionalidad nueva)
-- [ ] Breaking change (cambio que rompe compatibilidad)
-- [ ] Docs (cambios en documentación)
-- [ ] Refactor (reorganización de código sin cambiar funcionalidad)
-- [ ] Chore (cambios en build, deps, etc)
+`pnpm lint` · `pnpm typecheck` · `pnpm test:coverage` (mínimo 80%) · `pnpm audit --audit-level=high`.
+Si el check **verificar** está en rojo, el PR no se mergea.
 
-## ✅ Checklist
+## Lo que el CI NO puede verificar (revisar a mano)
 
-- [ ] Mi código sigue los estilos del proyecto
-- [ ] He hecho linting (`pnpm run lint:fix`)
-- [ ] He ejecutado tests (`pnpm run test`)
-- [ ] He agregado tests para los cambios (si aplica)
-- [ ] Documentación actualizada (si aplica)
-- [ ] Cambios no incluyen secretos o datos sensibles
-- [ ] Commit messages en formato convencional
+**Gobernanza**
+- [ ] La rama nació de `origin/main` actualizado (`git fetch && git switch -c ... origin/main`)
+- [ ] No contradice ninguna decisión D1–D6 del PLAN (o registra una decisión nueva)
+- [ ] No crea una segunda versión de algo que ya existe (una sola fuente de verdad)
 
-## 🧪 Testing
+**SDD**
+- [ ] Cumple los criterios de aceptación de la TASK, sin agregar alcance fuera de la SPEC
+- [ ] Documentación actualizada (README, `docs/`, docstrings) si cambió el comportamiento
+- [ ] Si cambió el esquema de datos: nueva migración SQL + tipos + `COLUMNAS_POR_TABLA`
 
-Describe los tests que realizaste:
+**Seguridad**
+- [ ] Ninguna clave secreta en el código ni con prefijo `NEXT_PUBLIC_`
+- [ ] Toda entrada externa se valida con los esquemas Zod de `@rcp/shared`
+- [ ] El código que usa `@rcp/shared/db` corre solo en el servidor
 
-```bash
-pnpm run test
-```
+## Cómo lo probé
 
-## 📸 Screenshots (si aplica)
-
-Adjunta screenshots de cambios visuales.
-
-## 📝 Notas Adicionales
-
-Cualquier otra información relevante.
-
----
-
-**Generado con [Claude Code](https://claude.com/claude-code)**
+<!-- Además del CI: qué probaste con datos reales (frases, fechas, casos límite). -->

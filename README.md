@@ -2,6 +2,8 @@
 
 Plataforma integral de empleabilidad y carrera profesional. Un asistente inteligente basado en Gemini que guía a usuarios en su trayectoria profesional con diagnósticos, recomendaciones personalizadas y seguimiento continuo.
 
+[![CI](https://github.com/esalinascl/rutadecarrera-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/esalinascl/rutadecarrera-platform/actions/workflows/ci.yml)
+
 ## 🎯 Descripción
 
 **Ruta de Carrera Platform** es una solución monorepo que integra:
@@ -95,11 +97,10 @@ cd rutadecarrera-platform
 pnpm install --frozen-lockfile
 cp .env.example .env.local   # completar con claves de STAGING
 
-pnpm test        # tests (Vitest)
-pnpm typecheck   # TypeScript
+pnpm lint && pnpm typecheck && pnpm test:coverage   # lo mismo que corre el CI
 ```
 
-Guía completa (incluye trabajo con dos computadores): [docs/setup.md](docs/setup.md).
+Guía completa (incluye trabajo con dos computadores): [docs/setup.md](docs/setup.md). Despliegue: [docs/deployment.md](docs/deployment.md).
 
 ### ⚠️ Variables de entorno: regla de seguridad
 

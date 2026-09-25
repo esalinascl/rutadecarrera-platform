@@ -65,13 +65,13 @@ en tu máquina). `.env.local` está en `.gitignore`: jamás se commitea.
 ## 4. Verificar que todo funciona
 
 ```bash
-pnpm test        # tests de todos los paquetes (Vitest)
-pnpm typecheck   # TypeScript sin errores
-pnpm -F @rcp/shared test:coverage   # cobertura (mínimo 80%, falla si baja)
-pnpm audit       # vulnerabilidades de dependencias
+pnpm lint                      # ESLint
+pnpm typecheck                 # TypeScript sin errores
+pnpm test:coverage             # tests + cobertura (mínimo 80%, falla si baja)
+pnpm audit --audit-level=high  # vulnerabilidades de dependencias
 ```
 
-Los cuatro deben terminar sin errores. Es lo mismo que verificará el CI en cada PR.
+Los cuatro deben terminar sin errores. Son **exactamente** los pasos del CI (`.github/workflows/ci.yml`): si pasan aquí, pasan allá.
 
 ## 5. Empezar una tarea
 
@@ -85,7 +85,7 @@ git switch -c feat/descripcion-corta origin/main   # SIEMPRE desde origin/main
 | Paquete | Estado |
 |---|---|
 | `packages/shared` (`@rcp/shared`) | ✅ Tipos, validación (Zod), cliente de base de datos, utilidades Gemini. Con tests. |
-| `apps/landing`, `apps/asistente`, `apps/test-disc` | ⏳ Solo `package.json`. Cada app Next.js se crea en su TASK (11 en adelante). Por eso aún no existen `pnpm dev`, `pnpm build` ni `pnpm lint`: se agregan cuando haya algo que ejecutar. |
+| `apps/landing`, `apps/asistente`, `apps/test-disc` | ⏳ Solo `package.json`. Cada app Next.js se crea en su TASK (11 en adelante). Por eso aún no existen `pnpm dev` ni `pnpm build`: se agregan cuando haya algo que ejecutar. |
 
 Al crear cada app (TASK 11+), su `next.config` debe incluir `transpilePackages: ['@rcp/shared']`, porque el paquete compartido se consume directo desde su código TypeScript.
 
