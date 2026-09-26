@@ -53,3 +53,6 @@ yarn.lock
 
 # Reportes de cobertura (se generan con pnpm test:coverage)
 coverage/
+
+# Artefactos de build de TypeScript
+*.tsbuildinfo
