@@ -15,11 +15,10 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "paths": {
-      "@rcp/db": ["packages/shared/db"],
-      "@rcp/types": ["packages/shared/types"],
-      "@rcp/utils": ["packages/shared/utils"]
+      "@rcp/shared": ["packages/shared/src/index.ts"],
+      "@rcp/shared/db": ["packages/shared/src/db/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "**/.next/**", "**/dist/**"]
 }

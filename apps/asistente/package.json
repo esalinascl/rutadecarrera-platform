@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "description": "Asistente inteligente de empleabilidad con Google Gemini",
   "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
   "dependencies": {
     "react": "catalog:",
     "react-dom": "catalog:",
@@ -16,6 +25,8 @@
     "typescript": "catalog:",
     "eslint": "catalog:",
     "eslint-config-next": "catalog:",
-    "prettier": "catalog:"
+    "prettier": "catalog:",
+    "@vitest/coverage-v8": "^5.0.1",
+    "vitest": "^5.0.1"
   }
 }
