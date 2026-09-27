@@ -13,6 +13,7 @@ import {
   safeValidate,
   callGemini,
   formatGeminiPrompt,
+  sanitizeGeminiResponse,
   GeminiError,
   type ChatResponse,
   type GeminiMessage,
@@ -50,6 +51,30 @@ function verificarLimite(usuarioId: string): boolean {
 
   entrada.count += 1;
   return true;
+}
+
+/**
+ * Gemini exige turnos con roles alternados ("user"/"model"): dos turnos
+ * consecutivos del mismo rol pueden ser rechazados con 400 INVALID_ARGUMENT.
+ * El prompt de sistema se antepone como turno "user" (ver TODO más abajo),
+ * lo que puede quedar pegado a otro turno "user" — sin historial (se pega al
+ * mensaje nuevo) o con un historial que empieza en "user". Se fusionan los
+ * turnos consecutivos del mismo rol en una sola entrada en vez de enviarlos
+ * por separado (hallazgo de revisión independiente antes de mergear TASK 6).
+ */
+function fusionarTurnosConsecutivos(mensajes: GeminiMessage[]): GeminiMessage[] {
+  const fusionados: GeminiMessage[] = [];
+
+  for (const mensaje of mensajes) {
+    const anterior = fusionados[fusionados.length - 1];
+    if (anterior && anterior.role === mensaje.role) {
+      anterior.parts = [...anterior.parts, ...mensaje.parts];
+    } else {
+      fusionados.push({ role: mensaje.role, parts: [...mensaje.parts] });
+    }
+  }
+
+  return fusionados;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -90,6 +115,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 
+  // Igual que GEMINI_API_KEY: si GEMINI_MODEL falta, fallar explícito en vez
+  // de dejar que @rcp/shared/utils/gemini caiga en su default ('gemini-pro'),
+  // modelo que Google ya descontinuó (ver docs/decisions/001-gemini-integration.md).
+  // Sin este chequeo, un ambiente mal configurado fallaría en silencio contra
+  // un modelo inválido en vez de dar un error claro en los logs.
+  const model = process.env.GEMINI_MODEL;
+
+  if (!model) {
+    console.error('GEMINI_MODEL no está configurado en el entorno');
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  }
+
   try {
     // El helper compartido no tiene un rol "system" nativo separado del
     // historial (Gemini sí lo soporta vía `systemInstruction`, pero
@@ -97,16 +134,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // prompt de sistema como el primer mensaje "user".
     // TODO(deuda técnica): si callGemini agrega soporte a systemInstruction
     // nativo, migrar esto y dejar de duplicar el rol "user" al inicio.
-    const mensajesGemini: GeminiMessage[] = [
+    const mensajesGemini = fusionarTurnosConsecutivos([
       { role: 'user', parts: [{ text: formatGeminiPrompt(contexto) }] },
       ...(historial ?? []),
       { role: 'user', parts: [{ text: mensaje }] },
-    ];
+    ]);
 
-    const respuestaGemini = await callGemini(mensajesGemini, apiKey, {
-      timeout: GEMINI_TIMEOUT_MS,
-      model: process.env.GEMINI_MODEL,
-    });
+    const respuestaGemini = sanitizeGeminiResponse(
+      await callGemini(mensajesGemini, apiKey, {
+        timeout: GEMINI_TIMEOUT_MS,
+        model,
+      }),
+    );
 
     // Logging de tokens (criterio de aceptación de TASK 6). No es
     // persistencia — eso es TASK 7+, solo observabilidad en logs de Vercel.
