@@ -201,6 +201,44 @@ describe('Validation - Schemas', () => {
 
       expect(() => chatRequestSchema.parse(request)).toThrow();
     });
+
+    it('debe aceptar historial dentro del límite de 40 turnos', () => {
+      const request = {
+        usuario_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        mensaje: 'Hola',
+        historial: Array.from({ length: 40 }, (_, i) => ({
+          role: i % 2 === 0 ? 'user' : 'model',
+          parts: [{ text: `Turno ${i}` }],
+        })),
+      };
+
+      expect(() => chatRequestSchema.parse(request)).not.toThrow();
+    });
+
+    it('debe rechazar historial con más de 40 turnos (evita costo de Gemini sin tope)', () => {
+      const request = {
+        usuario_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        mensaje: 'Hola',
+        historial: Array.from({ length: 41 }, (_, i) => ({
+          role: i % 2 === 0 ? 'user' : 'model',
+          parts: [{ text: `Turno ${i}` }],
+        })),
+      };
+
+      expect(() => chatRequestSchema.parse(request)).toThrow();
+    });
+
+    it('debe rechazar un turno del historial con texto de más de 5000 caracteres', () => {
+      const request = {
+        usuario_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        mensaje: 'Hola',
+        historial: [
+          { role: 'user', parts: [{ text: 'a'.repeat(5001) }] },
+        ],
+      };
+
+      expect(() => chatRequestSchema.parse(request)).toThrow();
+    });
   });
 
   describe('chatResponseSchema', () => {

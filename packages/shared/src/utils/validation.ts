@@ -98,12 +98,16 @@ export const chatRequestSchema = z.object({
     .min(1, 'Mensaje no puede estar vacío')
     .max(5000, 'Mensaje no puede exceder 5000 caracteres'),
   contexto: contextoSchema.optional(),
+  // Límites agregados en TASK 6 al conectar el endpoint a la API real y
+  // facturada de Gemini: sin tope, un historial gigante dispara costo sin
+  // control (ver hallazgo de revisión y meta de <$50/mes en
+  // docs/decisions/001-gemini-integration.md).
   historial: z.array(z.object({
     role: z.enum(['user', 'model']),
     parts: z.array(z.object({
-      text: z.string(),
-    })),
-  })).optional(),
+      text: z.string().max(5000, 'Cada mensaje del historial no puede exceder 5000 caracteres'),
+    })).min(1, 'Cada turno del historial debe tener al menos una parte'),
+  })).max(40, 'El historial no puede exceder 40 turnos').optional(),
 }).strict() satisfies Esquema<ChatRequest>;
 
 /**

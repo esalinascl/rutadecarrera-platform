@@ -56,3 +56,5 @@ coverage/
 
 # Artefactos de build de TypeScript
 *.tsbuildinfo
+.vercel
+.env*
