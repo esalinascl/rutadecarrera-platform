@@ -31,26 +31,12 @@ Plataforma integral de empleabilidad y carrera profesional. Un asistente intelig
 ```
 rutadecarrera-platform/
 │
-├── apps/                           # Aplicaciones principales
-│   ├── landing/                    # Landing page (marketing)
-│   │   ├── pages/
-│   │   ├── components/
-│   │   └── public/
-│   │
-│   ├── asistente/                  # Asistente inteligente (Gemini)
-│   │   ├── pages/
-│   │   ├── components/
-│   │   ├── api/
-│   │   │   ├── chat/               # Endpoint chat con Gemini
-│   │   │   ├── assess/             # Endpoint de evaluación
-│   │   │   └── recommendations/    # Endpoint de recomendaciones
-│   │   └── lib/
-│   │
-│   └── test-disc/                  # Test de competencias
-│       ├── pages/
-│       ├── components/
-│       ├── api/
-│       └── lib/
+├── apps/
+│   └── web/                        # ÚNICA app Next.js (ADR 002): landing, dashboard por rol, asistente y tests
+│       └── src/app/
+│           ├── api/chat/           # Endpoint chat con Gemini (+ __tests__)
+│           ├── layout.tsx
+│           └── page.tsx
 │
 ├── packages/                       # Paquetes compartidos
 │   └── shared/                     # UN solo paquete: @rcp/shared

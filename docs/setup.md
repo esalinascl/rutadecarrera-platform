@@ -85,9 +85,9 @@ git switch -c feat/descripcion-corta origin/main   # SIEMPRE desde origin/main
 | Paquete | Estado |
 |---|---|
 | `packages/shared` (`@rcp/shared`) | ✅ Tipos, validación (Zod), cliente de base de datos, utilidades Gemini. Con tests. |
-| `apps/landing`, `apps/asistente`, `apps/test-disc` | ⏳ Solo `package.json`. Cada app Next.js se crea en su TASK (11 en adelante). Por eso aún no existen `pnpm dev` ni `pnpm build`: se agregan cuando haya algo que ejecutar. |
+| `apps/web` (`@rcp/web`) | ✅ Única app Next.js ([ADR 002](decisions/002-una-sola-app.md)). Hoy: endpoint `POST /api/chat` con tests. Se ejecuta con `pnpm --filter @rcp/web dev` / `build`. |
 
-Al crear cada app (TASK 11+), su `next.config` debe incluir `transpilePackages: ['@rcp/shared']`, porque el paquete compartido se consume directo desde su código TypeScript.
+El `next.config` de `apps/web` debe incluir `transpilePackages: ['@rcp/shared']`, porque el paquete compartido se consume directo desde su código TypeScript.
 
 ## Problemas frecuentes
 

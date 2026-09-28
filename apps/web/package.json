@@ -1,7 +1,7 @@
 {
-  "name": "@rcp/asistente",
+  "name": "@rcp/web",
   "version": "0.1.0",
-  "description": "Asistente inteligente de empleabilidad con Google Gemini",
+  "description": "App única de Ruta de Carrera: landing, dashboard por rol, asistente Gemini y tests (ADR 002)",
   "private": true,
   "scripts": {
     "dev": "next dev",
