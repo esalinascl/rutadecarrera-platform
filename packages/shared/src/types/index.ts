@@ -300,3 +300,151 @@ export interface UsageStats {
     fin: IsoDateString;
   };
 }
+
+// ============================================================================
+// MÓDULO DE CRÉDITOS (BORRADOR — no aplicado a producción todavía)
+// ============================================================================
+// Fuente funcional: vault, "600 PROYECTOS/650 F&S RUTA DE CARRERA/
+// SPEC — Paquetes y Créditos de Tests (Interno).md" v0.4 (sección 5, Modelo
+// de datos). Migración SQL propuesta (también borrador):
+// packages/shared/src/db/migrations/002_creditos.sql
+//
+// Deliberadamente NO se integran todavía a `COLUMNAS_POR_TABLA` (db/schema.ts)
+// ni a ningún repositorio: eso requiere que la re-planificación de TASKS
+// resuelva primero AD-3 (login) y AD-9/AD-10 (permisos/RLS) — ver
+// 600 PROYECTOS/TAREAS/Re-planificar TASKS para una sola app y módulo de
+// créditos.md. Lo que sí se puede fijar ya (no depende de auth): la forma de
+// calcular un saldo a partir del libro de movimientos — ver
+// `calcularSaldoCredito` en utils/creditos.ts, con tests.
+// ============================================================================
+
+/** Código estable de un producto con saldo propio (SPEC §2). */
+export type CodigoProducto = 'disc' | 'rueda_fundadora' | 'asistente';
+
+/** Un test (créditos enteros) o el asistente (medido en milésimas de Crédito IA). */
+export type TipoProducto = 'test' | 'asistente';
+
+/** Unidad base en la que se mide el saldo de un producto. */
+export type UnidadProducto = 'credito' | 'milesima_credito_ia';
+
+export interface Producto {
+  id: string;
+  codigo: CodigoProducto;
+  tipo: TipoProducto;
+  unidad: UnidadProducto;
+  nombre: string;
+  activo: boolean;
+}
+
+/** Lo que se vende: N unidades de un producto, con precio (SPEC §2). */
+export interface Paquete {
+  id: string;
+  producto_id: string;
+  nombre: string;
+  /** Cantidad en la unidad base del producto (créditos enteros, o milésimas de Crédito IA). */
+  cantidad: number;
+  precio: number;
+  moneda: string;
+  activo: boolean;
+}
+
+export type EstadoCompra = 'pendiente' | 'pagada' | 'fallida' | 'reembolsada';
+
+export interface Compra {
+  id: string;
+  usuario_id: string;
+  paquete_id: string;
+  monto: number;
+  moneda: string;
+  proveedor_pago: string | null;
+  /** Id único que entrega la pasarela de pago (NF-4 de la SPEC: evita doble abono). */
+  referencia_externa: string | null;
+  estado: EstadoCompra;
+  creado_en: IsoDateString;
+  pagada_en: IsoDateString | null;
+}
+
+/**
+ * Tipo de movimiento del libro de créditos (NF-1 de la SPEC: el saldo nunca
+ * se guarda directo, se calcula sumando estos movimientos).
+ *
+ * Convención de signos — decisión de implementación de esta migración
+ * borrador, la SPEC original solo dice "delta" sin fijar la convención:
+ * `magnitud` es SIEMPRE >= 0, salvo en `'ajuste_admin'` donde el admin puede
+ * sumar o restar directamente. La dirección del efecto (qué bucket sube o
+ * baja) la determina el `tipo`, no el signo de `magnitud` — ver la tabla de
+ * reglas en `calcularSaldoCredito` (utils/creditos.ts). Se eligió así (en
+ * vez de un delta con signo libre) para que sea imposible invertir el efecto
+ * de un movimiento por un error de signo al insertarlo.
+ */
+export type TipoMovimientoCredito =
+  | 'compra'
+  | 'reserva'
+  | 'liberacion'
+  | 'consumo'
+  | 'consumo_tokens'
+  | 'ajuste_admin'
+  | 'reembolso';
+
+export interface MovimientoCredito {
+  id: string;
+  usuario_id: string;
+  producto_id: string;
+  tipo: TipoMovimientoCredito;
+  /** Cantidad en la unidad base del producto. Ver TipoMovimientoCredito. */
+  magnitud: number;
+  compra_id: string | null;
+  invitacion_id: string | null;
+  mensaje_id: string | null;
+  autor_id: string | null;
+  motivo: string | null;
+  creado_en: IsoDateString;
+}
+
+/** Saldo derivado del libro de movimientos para un (usuario, producto). */
+export interface SaldoCredito {
+  disponibles: number;
+  reservados: number;
+  usados: number;
+}
+
+export type EstadoInvitacion =
+  | 'enviada'
+  | 'abierta'
+  | 'en_curso'
+  | 'completada'
+  | 'expirada'
+  | 'revocada';
+
+export type CanalInvitacion = 'email' | 'link';
+
+export interface InvitacionTest {
+  id: string;
+  emisor_id: string;
+  producto_id: string;
+  email_destino: string;
+  nombre_destino: string | null;
+  cliente_id: string | null;
+  /** Solo se guarda el hash del token (NF-3 de la SPEC); el token real vive en el link. */
+  token_hash: string;
+  canal: CanalInvitacion;
+  estado: EstadoInvitacion;
+  consentimiento_en: IsoDateString | null;
+  clave_idempotencia: string | null;
+  expira_en: IsoDateString;
+  creado_en: IsoDateString;
+  abierta_en: IsoDateString | null;
+  completada_en: IsoDateString | null;
+  /** FK pendiente: `test_disc_resultados` todavía no existe (ver M5 del PLAN). */
+  resultado_id: string | null;
+}
+
+/** Conversión configurable de tokens de Gemini a Créditos IA (NF-11 de la SPEC). */
+export interface TarifaCreditoIA {
+  id: string;
+  tokens_por_credito: number;
+  peso_entrada: number;
+  peso_salida: number;
+  vigente_desde: IsoDateString;
+  creado_por: string | null;
+}
