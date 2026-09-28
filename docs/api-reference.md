@@ -1,6 +1,6 @@
 # API Reference — Asistente de Empleabilidad
 
-> Fuente de verdad de los endpoints de `apps/asistente`. Actualizar en el
+> Fuente de verdad de los endpoints de `apps/web`. Actualizar en el
 > mismo commit que cambie un endpoint (regla de gobernanza #10).
 
 ## POST /api/chat

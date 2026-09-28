@@ -40,12 +40,12 @@ Settings → Branches → Add rule → `main`:
 
 Cómo aplicar la migración: [database-schema.md](database-schema.md#aplicar-la-migración).
 
-### 3. Vercel: un proyecto por app
+### 3. Vercel: un solo proyecto ([ADR 002](decisions/002-una-sola-app.md))
 
-Se crea cuando la app tenga código (TASK 11+). Por cada app (`landing`, `asistente`, `test-disc`):
+Un único proyecto Vercel (`rutadecarrera`) sirve la app `apps/web`:
 
-1. Vercel → Add New Project → importar `esalinascl/rutadecarrera-platform`.
-2. **Root Directory**: `apps/<app>`.
+1. Proyecto conectado a `esalinascl/rutadecarrera-platform`.
+2. **Root Directory**: `apps/web`.
 3. **Environment Variables**, separadas por entorno:
 
 | Variable | Preview | Production |
@@ -58,7 +58,7 @@ Se crea cuando la app tenga código (TASK 11+). Por cada app (`landing`, `asiste
 
 > **Regla D3:** un preview nunca usa claves ni base de datos de producción.
 
-4. Dominio: pendiente de decidir qué dominio sirve a qué app (ver PLAN).
+4. Dominio: `www.rutadecarrera.com` y el apex. `app.*` y `disc.*` pasan a redirecciones 301 hacia `www` por etapas (ver ADR 002).
 
 ## Revertir un despliegue malo
 

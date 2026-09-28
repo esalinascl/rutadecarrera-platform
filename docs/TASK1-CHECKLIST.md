@@ -5,6 +5,8 @@
 **Owner:** Eduardo Salinas Belletti  
 **Estado:** ✅ COMPLETADA
 
+> **Nota histórica (2026-09-27):** la estructura de 3 apps descrita aquí fue reemplazada por una sola app `apps/web`. Ver [ADR 002](decisions/002-una-sola-app.md).
+
 ---
 
 ## 📋 Criterios de Aceptación
