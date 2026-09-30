@@ -1,0 +1,55 @@
+# ============================================================================
+# SECURITY — rutadecarrera-platform (SAST)
+# ----------------------------------------------------------------------------
+# Análisis estático de seguridad (CodeQL) para JavaScript/TypeScript.
+# Complementa `pnpm audit` (que ya corre en ci.yml): audit revisa
+# vulnerabilidades conocidas en dependencias de terceros; CodeQL revisa el
+# código propio en busca de patrones inseguros (inyección, XSS, secretos
+# hardcodeados, etc. — mandato #2 de CLAUDE.md).
+#
+# Regla #6 de gobernanza: sin continue-on-error. Si CodeQL encuentra un
+# hallazgo de severidad alta, queda visible en la pestaña Security del repo.
+#
+# Acciones fijadas por SHA de commit (una etiqueta puede moverse; un SHA no).
+# ============================================================================
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  # Semanal, el día después del CI semanal (mismo patrón que ci.yml).
+  schedule:
+    - cron: '0 13 * * 1' # lunes 10:00 hora de Chile (13:00 UTC)
+  workflow_dispatch:
+
+# Mínimo privilegio: leer código + escribir resultados de seguridad (requerido
+# por CodeQL para subir hallazgos a la pestaña Security).
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: codeql
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Inicializar CodeQL (JavaScript/TypeScript)
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        with:
+          languages: javascript-typescript
+
+      - name: Analizar
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        with:
+          category: '/language:javascript-typescript'

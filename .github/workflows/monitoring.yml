@@ -1,0 +1,91 @@
+# ============================================================================
+# MONITORING — rutadecarrera-platform (health checks de producción)
+# ----------------------------------------------------------------------------
+# Origen: 000 NEXUS/LOGS/2026-09-29 Post-mortem — disc.rutadecarrera.com 404
+# por deploys cruzados. disc.rutadecarrera.com estuvo caído ≥24h sin que nadie
+# lo notara — se detectó por casualidad al revisar los checks de un PR no
+# relacionado. Este workflow existe para que la próxima vez lo avise solo,
+# en minutos, no en horas.
+#
+# Verifica los 3 dominios de producción conectados al ecosistema
+# rutadecarrera.com (confirmados con `vercel project ls` el 2026-09-29):
+#   - app.rutadecarrera.com   → proyecto "rutadecarrera" (apps/web, /api/chat)
+#   - disc.rutadecarrera.com  → proyecto "disc-rutadecarrera" (Test DISC)
+#   - www.rutadecarrera.com   → landing (hoy placeholder "Muy pronto")
+#
+# Si un dominio falla, este workflow queda en rojo y GitHub notifica por
+# email a los watchers del repo (sin integración de Slack/webhook: 80/20,
+# se puede agregar después si hace falta más inmediatez).
+#
+# No usa continue-on-error (regla #6 de gobernanza): un fallo real debe
+# poder verse en rojo.
+# ============================================================================
+name: Monitoring
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # cada 30 minutos
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  responde-2xx:
+    name: responde-2xx (${{ matrix.nombre }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nombre: 'landing-www'
+            url: 'https://www.rutadecarrera.com'
+          - nombre: 'app-asistente'
+            url: 'https://app.rutadecarrera.com'
+          - nombre: 'test-disc'
+            url: 'https://disc.rutadecarrera.com'
+    steps:
+      - name: 'Verificar que responde 2xx'
+        run: |
+          curl -fsS --max-time 15 "${{ matrix.url }}" -o /dev/null
+          echo "✅ ${{ matrix.url }} respondió correctamente"
+
+  contenido-disc-correcto:
+    name: contenido-disc-correcto
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Un 200 no basta: el incidente del 2026-09-27 mostró que un deploy
+      # cruzado puede sobrescribir el contenido real sin cambiar el status
+      # code final (el 404 fue la primera señal, pero el riesgo de fondo es
+      # "sirve el contenido equivocado"). Se verifica el contenido, no solo
+      # el código de respuesta.
+      - name: 'Verificar que disc.rutadecarrera.com sirve el Test DISC (no otro contenido)'
+        run: |
+          CONTENIDO=$(curl -fsS --max-time 15 "https://disc.rutadecarrera.com")
+          if ! echo "$CONTENIDO" | grep -q "Test DISC"; then
+            echo "❌ disc.rutadecarrera.com respondió 200 pero sin el contenido esperado del Test DISC."
+            echo "Este es el patrón exacto del incidente del 2026-09-27 (deploy cruzado desde el monorepo)."
+            exit 1
+          fi
+          echo "✅ Contenido del Test DISC presente"
+
+  api-chat-activo:
+    name: api-chat-activo
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # /api/chat responde 400 con body vacío (validación de entrada) — eso
+      # es correcto y esperado. Lo que NO debe pasar es 404 (endpoint
+      # desaparecido, ej. por un deploy al Root Directory equivocado) o 5xx.
+      - name: 'Verificar que /api/chat existe en app.rutadecarrera.com'
+        run: |
+          CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -X POST "https://app.rutadecarrera.com/api/chat" \
+            -H "Content-Type: application/json" -d '{}')
+          if [ "$CODIGO" = "404" ] || [ "$CODIGO" -ge 500 ]; then
+            echo "❌ /api/chat respondió $CODIGO (esperado: 400 por body vacío)"
+            exit 1
+          fi
+          echo "✅ /api/chat responde $CODIGO (endpoint activo)"
