@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.0",
-    "zod": "^3.22.0"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "catalog:",
