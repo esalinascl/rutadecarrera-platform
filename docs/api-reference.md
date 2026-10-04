@@ -60,8 +60,9 @@ reinicia, y es evadible sin autenticación real (pendiente TASK 9).
 ### Gemini
 
 - Timeout: 5 segundos por llamada (`GEMINI_TIMEOUT_MS` en `route.ts`).
-- Modelo: el de la variable de entorno `GEMINI_MODEL` (`gemini-2.5-flash`
-  al momento de escribir esto).
+- Modelo: el de la variable de entorno `GEMINI_MODEL` (`gemini-3.8-flash`
+  desde 2026-10-03; `gemini-2.5-flash` fue descontinuado). Es obligatorio:
+  no hay modelo por defecto.
 - Tokens usados: se loguean en cada request (`console.log` estructurado,
   evento `gemini_tokens_used`) para observabilidad — todavía no se
   persisten en base de datos (eso es TASK 7+).
