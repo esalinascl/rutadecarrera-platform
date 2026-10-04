@@ -46,3 +46,17 @@ descontinuado).
   producción contra al menos una alternativa antes de comprometerse más
   (ej. antes de TASK 9/autenticación, cuando el tráfico real empiece a
   generar costo).
+
+## Actualización 2026-10-03
+
+- **Migración de modelo:** Google descontinuó `gemini-2.5-flash`. El modelo
+  vigente del proyecto pasa a ser `gemini-3.8-flash` (`GEMINI_MODEL` en
+  `.env.example`). La decisión de fondo (usar Gemini) no cambia.
+- **`model` ahora es obligatorio:** `callGemini` ya no tiene modelo por
+  defecto (antes caía en `gemini-pro`, también descontinuado). El tipo de sus
+  opciones exige `model` en compilación y, en runtime, lanza `GeminiError`
+  con code `MISSING_MODEL` antes de llamar a la API si el modelo falta o
+  viene vacío. `extractAnalysis` recibe el modelo como parámetro obligatorio
+  y `getDefaultGeminiConfig()` dejó de devolver un modelo. Así, el próximo
+  modelo que se descontinúe solo requiere cambiar `GEMINI_MODEL`, sin riesgo
+  de que un default oculto falle en silencio en producción.

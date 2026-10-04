@@ -36,14 +36,14 @@ function uuidDePrueba(): string {
 const RESPUESTA_GEMINI_OK = {
   response: 'Basado en tu perfil, te recomiendo enfocarte en...',
   tokensUsed: 128,
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.8-flash',
   finishReason: 'STOP',
 };
 
 describe('POST /api/chat', () => {
   beforeEach(() => {
     vi.stubEnv('GEMINI_API_KEY', 'clave-de-prueba-no-real-1234567890');
-    vi.stubEnv('GEMINI_MODEL', 'gemini-2.5-flash');
+    vi.stubEnv('GEMINI_MODEL', 'gemini-3.8-flash');
     callGeminiMock.mockReset();
     callGeminiMock.mockResolvedValue(RESPUESTA_GEMINI_OK);
   });
@@ -118,7 +118,7 @@ describe('POST /api/chat', () => {
     await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: 'Hola' }));
 
     const [, , opciones] = callGeminiMock.mock.calls[0];
-    expect(opciones).toMatchObject({ timeout: 5000, model: 'gemini-2.5-flash' });
+    expect(opciones).toMatchObject({ timeout: 5000, model: 'gemini-3.8-flash' });
   });
 
   it('usa el conversacion_id recibido en vez de generar uno nuevo', async () => {

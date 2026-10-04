@@ -215,7 +215,8 @@ export interface GeminiCallOptions {
   temperature?: number;
   maxTokens?: number;
   timeout?: number;
-  model?: string;
+  /** Obligatorio, sin default: debe venir de GEMINI_MODEL (los modelos se descontinúan). */
+  model: string;
   topK?: number;
   topP?: number;
 }

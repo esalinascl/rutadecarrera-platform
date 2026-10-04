@@ -65,22 +65,22 @@ export function validateGeminiApiKey(apiKey: string): void {
  *
  * @param messages - Array de mensajes (historial + mensaje actual)
  * @param apiKey - API key de Gemini
- * @param options - Opciones de configuración
+ * @param options - Opciones de configuración (`model` es obligatorio)
  * @returns Respuesta de Gemini con metadata
- * @throws GeminiError en caso de error
+ * @throws GeminiError en caso de error (code 'MISSING_MODEL' si falta el modelo)
  *
  * @example
  * const respuesta = await callGemini(
  *   [{ role: 'user', parts: [{ text: 'Hola' }] }],
  *   process.env.GEMINI_API_KEY!,
- *   { temperature: 0.7, maxTokens: 500, timeout: 5000 }
+ *   { temperature: 0.7, maxTokens: 500, timeout: 5000, model: process.env.GEMINI_MODEL! }
  * );
  * console.log(respuesta.response);
  */
 export async function callGemini(
   messages: GeminiMessage[],
   apiKey: string,
-  options?: GeminiCallOptions,
+  options: GeminiCallOptions,
 ): Promise<GeminiResponse> {
   // Validaciones previas
   validateGeminiApiKey(apiKey);
@@ -97,10 +97,22 @@ export async function callGemini(
     temperature = 0.7,
     maxTokens = 2048,
     timeout = 5000,
-    model = 'gemini-pro',
+    model,
     topK = 40,
     topP = 0.95,
-  } = options || {};
+  }: Partial<GeminiCallOptions> = options ?? {};
+
+  // Sin default a propósito: Google descontinúa modelos (gemini-pro,
+  // gemini-2.5-flash) y un default oculto fallaría en silencio en producción.
+  // El tipo ya exige `model`, pero callers JS o una GEMINI_MODEL vacía pueden
+  // llegar aquí sin él: se valida antes de cualquier fetch.
+  if (typeof model !== 'string' || model.trim() === '') {
+    throw new GeminiError(
+      'Debes indicar el modelo de Gemini (configura GEMINI_MODEL)',
+      'MISSING_MODEL',
+      400,
+    );
+  }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
@@ -265,6 +277,7 @@ Usa este contexto para personalizar tus respuestas.`;
  *
  * @param messages - Historial de mensajes
  * @param apiKey - API key de Gemini
+ * @param model - Modelo de Gemini (obligatorio, normalmente GEMINI_MODEL)
  * @param contexto - Contexto inicial del usuario
  * @returns AnalysisResult con insights
  *
@@ -272,12 +285,14 @@ Usa este contexto para personalizar tus respuestas.`;
  * const analysis = await extractAnalysis(
  *   historicalMessages,
  *   process.env.GEMINI_API_KEY!,
+ *   process.env.GEMINI_MODEL!,
  *   userContext
  * );
  */
 export async function extractAnalysis(
   messages: Message[],
   apiKey: string,
+  model: string,
   contexto?: ContextoInicial,
 ): Promise<AnalysisResult> {
   if (!messages || messages.length === 0) {
@@ -331,6 +346,7 @@ Asegúrate de:
       temperature: 0.5, // Más determinístico para análisis
       maxTokens: 1500,
       timeout: 10000,
+      model,
     });
 
     // Parsear respuesta JSON
@@ -378,10 +394,10 @@ Asegúrate de:
  * basado en tokens y modelo
  *
  * @param tokens - Número de tokens
- * @param model - Modelo Gemini
+ * @param model - Modelo Gemini (obligatorio, sin default)
  * @returns Tiempo estimado en ms
  */
-export function estimateProcessingTime(tokens: number, model: string = 'gemini-pro'): number {
+export function estimateProcessingTime(tokens: number, model: string): number {
   // Estimaciones base (ms por token)
   const timePerToken = model === 'gemini-pro' ? 0.5 : 1;
   // Agregar latencia de red (200-500ms)
@@ -393,14 +409,15 @@ export function estimateProcessingTime(tokens: number, model: string = 'gemini-p
 /**
  * Crea un objeto de configuración por defecto para Gemini
  *
- * @returns GeminiCallOptions con valores por defecto
+ * No incluye `model`: no hay modelo por defecto, debe venir de GEMINI_MODEL.
+ *
+ * @returns GeminiCallOptions (sin `model`) con valores por defecto
  */
-export function getDefaultGeminiConfig(): Required<GeminiCallOptions> {
+export function getDefaultGeminiConfig(): Required<Omit<GeminiCallOptions, 'model'>> {
   return {
     temperature: 0.7,
     maxTokens: 2048,
     timeout: 5000,
-    model: 'gemini-pro',
     topK: 40,
     topP: 0.95,
   };
