@@ -21,13 +21,13 @@
     "pnpm": ">=12.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "catalog:",
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "prettier": "catalog:",
     "eslint": "catalog:",
     "husky": "^8.0.0",
-    "lint-staged": "^15.0.0",
-    "@eslint/js": "catalog:",
+    "lint-staged": "^17.6.0",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
     "typescript-eslint": "catalog:"
   }
 }

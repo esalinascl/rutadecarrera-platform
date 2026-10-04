@@ -1,0 +1,46 @@
+# Dependabot — actualizaciones automáticas de dependencias.
+#
+# Por qué existe (2026-10-04): `pnpm audit` del CI falla por GHSA-vfj7-8cjw-p6xm
+# (braces <=3.0.3, sin parche). La vulnerabilidad NO se ignora: se corrige
+# cuando exista una salida real. Hoy llega solo por
+#   eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch > braces
+# Dependabot abre un PR cada semana cuando sale una versión nueva; el CI de ese
+# PR (paso "Auditoría de dependencias") dirá en verde cuándo quedó resuelto.
+# Seguimiento en el vault: "CI rojo en main — advisory braces sin parche".
+version: 2
+updates:
+  - package-ecosystem: "npm" # cubre pnpm (pnpm-lock.yaml y catálogo)
+    directories:
+      - "/"
+      - "/apps/web"
+      - "/packages/shared"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Santiago"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Next.js y su config de ESLint se actualizan juntos (misma versión).
+      next:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@next/*"
+      dev-menores:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Santiago"
+    commit-message:
+      prefix: "chore(ci)"
