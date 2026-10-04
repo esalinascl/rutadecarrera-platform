@@ -4,6 +4,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   callGemini,
   formatGeminiPrompt,
@@ -19,6 +22,9 @@ import type { GeminiMessage, Message, ContextoInicial } from '../types';
 
 /** Fecha fija en ISO 8601: así llegan las fechas desde Supabase y la API. */
 const FECHA_ISO = '2026-09-24T10:30:00.000Z';
+
+/** Modelo vigente del proyecto (gemini-pro y gemini-2.5-flash fueron descontinuados). */
+const MODELO = 'gemini-3.8-flash';
 
 // Mock fetch global
 global.fetch = vi.fn();
@@ -79,12 +85,12 @@ describe('Gemini - callGemini', () => {
     const respuesta = await callGemini(
       messages,
       'AIzaSyD' + 'a'.repeat(30),
-      { timeout: 5000 },
+      { timeout: 5000, model: MODELO },
     );
 
     expect(respuesta.response).toBe('Respuesta del asistente');
     expect(respuesta.tokensUsed).toBe(150);
-    expect(respuesta.model).toBe('gemini-pro');
+    expect(respuesta.model).toBe(MODELO);
   });
 
   it('debe lanzar error si API retorna error', async () => {
@@ -101,7 +107,7 @@ describe('Gemini - callGemini', () => {
     ];
 
     await expect(
-      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30)),
+      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30), { model: MODELO }),
     ).rejects.toThrow(GeminiError);
   });
 
@@ -125,7 +131,7 @@ describe('Gemini - callGemini', () => {
     const messages: GeminiMessage[] = [{ role: 'user', parts: [{ text: 'Hola' }] }];
 
     await expect(
-      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30), { timeout: 50 }),
+      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30), { timeout: 50, model: MODELO }),
     ).rejects.toMatchObject({ name: 'GeminiError', code: 'TIMEOUT' });
   });
 
@@ -138,7 +144,7 @@ describe('Gemini - callGemini', () => {
     const messages: GeminiMessage[] = [{ role: 'user', parts: [{ text: 'Hola' }] }];
 
     await expect(
-      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30), { timeout: 50 }),
+      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30), { timeout: 50, model: MODELO }),
     ).rejects.toMatchObject({ name: 'GeminiError', code: 'TIMEOUT' });
   });
 
@@ -152,7 +158,7 @@ describe('Gemini - callGemini', () => {
       }),
     });
 
-    await callGemini([{ role: 'user', parts: [{ text: 'Hola' }] }], apiKey);
+    await callGemini([{ role: 'user', parts: [{ text: 'Hola' }] }], apiKey, { model: MODELO });
 
     const [url, init] = (global.fetch as any).mock.calls[0];
     expect(url).not.toContain(apiKey);
@@ -162,7 +168,7 @@ describe('Gemini - callGemini', () => {
 
   it('debe rechazar mensajes vacíos', async () => {
     await expect(
-      callGemini([], 'AIzaSyD' + 'a'.repeat(30)),
+      callGemini([], 'AIzaSyD' + 'a'.repeat(30), { model: MODELO }),
     ).rejects.toThrow(GeminiError);
   });
 
@@ -171,7 +177,7 @@ describe('Gemini - callGemini', () => {
       { role: 'user', parts: [{ text: 'Hola' }] },
     ];
 
-    await expect(callGemini(messages, '')).rejects.toThrow(GeminiError);
+    await expect(callGemini(messages, '', { model: MODELO })).rejects.toThrow(GeminiError);
   });
 
   it('debe usar opciones personalizadas', async () => {
@@ -194,11 +200,43 @@ describe('Gemini - callGemini', () => {
     await callGemini(messages, 'AIzaSyD' + 'a'.repeat(30), {
       temperature: 0.5,
       maxTokens: 500,
-      model: 'gemini-pro',
+      model: MODELO,
     });
 
     const callArgs = (global.fetch as any).mock.calls[0];
-    expect(callArgs[0]).toContain('gemini-pro');
+    expect(callArgs[0]).toContain(MODELO);
+  });
+
+  // RF-G1: sin modelo, falla explícito ANTES de llamar a la API (antes caía
+  // en silencio al default 'gemini-pro', modelo descontinuado por Google).
+  it.each([
+    ['ausente', {}],
+    ['string vacío', { model: '' }],
+    ['solo espacios', { model: '   ' }],
+  ])('lanza MISSING_MODEL sin hacer fetch si el modelo está %s', async (_caso, opciones) => {
+    const messages: GeminiMessage[] = [{ role: 'user', parts: [{ text: 'Hola' }] }];
+
+    await expect(
+      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30), opciones as { model: string }),
+    ).rejects.toMatchObject({ name: 'GeminiError', code: 'MISSING_MODEL' });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  // RF-G2: el modelo es obligatorio en compilación; la validación en runtime
+  // (RF-G1) sigue protegiendo a callers JS que omitan las opciones.
+  it('exige las opciones con modelo en compilación y valida en runtime si faltan', async () => {
+    const messages: GeminiMessage[] = [{ role: 'user', parts: [{ text: 'Hola' }] }];
+
+    await expect(
+      // @ts-expect-error -- RF-G2: el tercer parámetro (con `model`) es obligatorio
+      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30)),
+    ).rejects.toMatchObject({ code: 'MISSING_MODEL' });
+
+    await expect(
+      // @ts-expect-error -- RF-G2: `model` es obligatorio dentro de las opciones
+      callGemini(messages, 'AIzaSyD' + 'a'.repeat(30), { timeout: 5000 }),
+    ).rejects.toMatchObject({ code: 'MISSING_MODEL' });
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
 
@@ -286,17 +324,40 @@ describe('Gemini - extractAnalysis', () => {
     const análisis = await extractAnalysis(
       messages,
       'AIzaSyD' + 'a'.repeat(30),
+      MODELO,
     );
 
     expect(análisis.fortalezas).toContain('Liderazgo');
     expect(análisis.brechas).toContain('SQL');
     expect(análisis.recomendaciones.length).toBeGreaterThan(0);
     expect(análisis.proximos_pasos.length).toBeGreaterThan(0);
+
+    // RF-G3: el modelo recibido llega a la URL de la API (sin defaults ocultos).
+    const [url] = (global.fetch as any).mock.calls[0];
+    expect(url).toContain(`/models/${MODELO}:generateContent`);
+  });
+
+  it('lanza MISSING_MODEL sin hacer fetch si el modelo viene vacío', async () => {
+    const messages: Message[] = [
+      {
+        id: 'msg-1',
+        conversacion_id: 'conv-1',
+        rol: 'user',
+        contenido: 'Soy ingeniero de software',
+        tokens_usage: null,
+        creado_en: FECHA_ISO,
+      },
+    ];
+
+    await expect(
+      extractAnalysis(messages, 'AIzaSyD' + 'a'.repeat(30), ''),
+    ).rejects.toMatchObject({ name: 'GeminiError', code: 'MISSING_MODEL' });
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('debe rechazar mensajes vacíos', async () => {
     await expect(
-      extractAnalysis([], 'AIzaSyD' + 'a'.repeat(30)),
+      extractAnalysis([], 'AIzaSyD' + 'a'.repeat(30), MODELO),
     ).rejects.toThrow(GeminiError);
   });
 
@@ -325,7 +386,7 @@ describe('Gemini - extractAnalysis', () => {
     ];
 
     await expect(
-      extractAnalysis(messages, 'AIzaSyD' + 'a'.repeat(30)),
+      extractAnalysis(messages, 'AIzaSyD' + 'a'.repeat(30), MODELO),
     ).rejects.toThrow(GeminiError);
   });
 
@@ -366,7 +427,7 @@ describe('Gemini - extractAnalysis', () => {
 
     // Debería fallar porque los arrays están vacíos
     await expect(
-      extractAnalysis(messages, 'AIzaSyD' + 'a'.repeat(30)),
+      extractAnalysis(messages, 'AIzaSyD' + 'a'.repeat(30), MODELO),
     ).rejects.toThrow();
   });
 });
@@ -374,14 +435,14 @@ describe('Gemini - extractAnalysis', () => {
 describe('Gemini - Utility Functions', () => {
   describe('estimateProcessingTime', () => {
     it('debe estimar tiempo de procesamiento', () => {
-      const tiempo = estimateProcessingTime(100);
+      const tiempo = estimateProcessingTime(100, MODELO);
       expect(tiempo).toBeGreaterThan(0);
       expect(tiempo).toBeLessThan(500); // < 500ms para 100 tokens
     });
 
     it('debe aumentar con más tokens', () => {
-      const tiempo100 = estimateProcessingTime(100);
-      const tiempo1000 = estimateProcessingTime(1000);
+      const tiempo100 = estimateProcessingTime(100, MODELO);
+      const tiempo1000 = estimateProcessingTime(1000, MODELO);
       expect(tiempo1000).toBeGreaterThan(tiempo100);
     });
   });
@@ -392,7 +453,40 @@ describe('Gemini - Utility Functions', () => {
       expect(config.temperature).toBe(0.7);
       expect(config.maxTokens).toBe(2048);
       expect(config.timeout).toBe(5000);
-      expect(config.model).toBe('gemini-pro');
+    });
+
+    // RF-G4: la config por defecto ya no trae modelo; debe venir de GEMINI_MODEL.
+    it('no incluye un modelo por defecto', () => {
+      expect(getDefaultGeminiConfig()).not.toHaveProperty('model');
+    });
+  });
+
+  // RF-G4: ningún código de producción usa 'gemini-pro' como valor por defecto.
+  describe('sin modelo descontinuado como default', () => {
+    const RAIZ_REPO = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    const DIRECTORIOS_PRODUCCION = ['packages', 'apps'];
+    const IGNORADOS = new Set(['node_modules', '.next', 'coverage', 'dist', '__tests__']);
+    // Asignación o propiedad con el literal (`= 'gemini-pro'`, `model: MODELO`),
+    // pero no comparaciones (`=== 'gemini-pro'`).
+    const DEFAULT_GEMINI_PRO = /(?<![=!])[=:]\s*['"`]gemini-pro['"`]/;
+
+    function archivosDeProduccion(directorio: string): string[] {
+      return readdirSync(directorio).flatMap((nombre) => {
+        if (IGNORADOS.has(nombre)) return [];
+        const ruta = join(directorio, nombre);
+        if (statSync(ruta).isDirectory()) return archivosDeProduccion(ruta);
+        return /\.tsx?$/.test(nombre) && !/\.test\.tsx?$/.test(nombre) ? [ruta] : [];
+      });
+    }
+
+    it('ningún archivo .ts/.tsx de producción asigna gemini-pro como default', () => {
+      const ofensores = DIRECTORIOS_PRODUCCION.flatMap((d) =>
+        archivosDeProduccion(join(RAIZ_REPO, d)),
+      )
+        .filter((ruta) => DEFAULT_GEMINI_PRO.test(readFileSync(ruta, 'utf8')))
+        .map((ruta) => relative(RAIZ_REPO, ruta));
+
+      expect(ofensores).toEqual([]);
     });
   });
 
@@ -402,7 +496,7 @@ describe('Gemini - Utility Functions', () => {
         response:
           'Aquí está tu API key: sk-12345 y token: abc123',
         tokensUsed: 100,
-        model: 'gemini-pro',
+        model: MODELO,
       };
 
       const sanitizada = sanitizeGeminiResponse(response);
@@ -417,7 +511,7 @@ describe('Gemini - Utility Functions', () => {
       const response = {
         response: `Usa ${claveGoogle} o ${jwt} para conectar`,
         tokensUsed: 10,
-        model: 'gemini-pro',
+        model: MODELO,
       };
 
       const sanitizada = sanitizeGeminiResponse(response);
@@ -428,7 +522,7 @@ describe('Gemini - Utility Functions', () => {
     it('NO altera texto de coaching que menciona API, token o clave', () => {
       const texto =
         'La clave de tu transición es aprender a diseñar una API REST y entender cómo funciona un token de sesión.';
-      const response = { response: texto, tokensUsed: 10, model: 'gemini-pro' };
+      const response = { response: texto, tokensUsed: 10, model: MODELO };
 
       expect(sanitizeGeminiResponse(response).response).toBe(texto);
     });
@@ -461,7 +555,7 @@ describe('Gemini - Utility Functions', () => {
       const response = {
         response: 'Aquí está tu análisis de empleabilidad',
         tokensUsed: 100,
-        model: 'gemini-pro',
+        model: MODELO,
       };
 
       const sanitizada = sanitizeGeminiResponse(response);
