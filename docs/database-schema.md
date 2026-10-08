@@ -116,7 +116,7 @@ La migración es repetible (`IF NOT EXISTS`): ejecutarla dos veces no rompe nada
 
 1. Supabase → proyecto **staging** → SQL Editor.
 2. Pegar el contenido de la migración y ejecutar (`001` si la base está vacía; luego `003`).
-3. Verificar: 4 tablas con RLS activo, columna `usuarios.rol`, 9 políticas y los 3 triggers nuevos. Ejecutarla **dos veces** (es repetible) y revisar el linter de seguridad de Supabase.
+3. Verificar: 4 tablas con RLS activo, columna `usuarios.rol`, 9 políticas y 4 triggers nuevos (2 sobre auth.users y 1 de fecha en usuarios y otro en conversaciones). Ejecutarla **dos veces** (es repetible) y revisar el linter de seguridad de Supabase.
 4. Repetir en **producción** solo después de mergear a `main` y con autorización explícita de Eduardo.
 
 Las pruebas automáticas de RLS (`rls.test.ts`) corren sobre Postgres en memoria (PGlite) con un Supabase emulado, así que **no reemplazan** la verificación en staging.
