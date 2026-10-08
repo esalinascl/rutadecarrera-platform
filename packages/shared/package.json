@@ -25,6 +25,7 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "^5.0.1",
     "typescript": "catalog:",

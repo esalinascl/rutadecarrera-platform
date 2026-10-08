@@ -7,8 +7,12 @@
  *   Por eso este módulo SOLO puede ejecutarse en el servidor (API routes,
  *   server actions). Si se importa en el navegador, lanza un error.
  * - Nunca exponer esta clave con prefijo `NEXT_PUBLIC_`.
- * - La clave pública (anon) no sirve aquí: con RLS activo y sin políticas,
- *   no puede leer ni escribir nada (ver migrations/001_init_schema.sql).
+ * - La clave pública (anon) no sirve aquí: no tiene privilegios ni políticas
+ *   en ninguna tabla (ver migrations/003_auth_rls.sql).
+ * - Estos repositorios usan la service role: para datos de usuario con sesión
+ *   (AD-10 → B1) se usará un cliente con la sesión del usuario y RLS decide.
+ * - `actualizado_en` NO se envía: lo marca la base con un trigger, y el rol
+ *   `authenticated` no tiene permiso para escribirlo.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -22,7 +26,6 @@ import type {
   DatabaseClient,
   MensajeCreate,
   MensajeRepository,
-  UsuarioCreate,
   UsuarioRepository,
   UsuarioUpdate,
 } from './schema';
@@ -130,12 +133,6 @@ export class SupabaseDatabaseClient implements DatabaseClient {
 export class SupabaseUsuarioRepository implements UsuarioRepository {
   constructor(private readonly client: SupabaseClient) {}
 
-  async create(usuario: UsuarioCreate): Promise<User> {
-    const { data, error } = await this.client.from('usuarios').insert(usuario).select().single();
-    if (error) fallar('usuarios.create', error);
-    return data as User;
-  }
-
   async findById(id: string): Promise<User | null> {
     const { data, error } = await this.client
       .from('usuarios')
@@ -159,7 +156,7 @@ export class SupabaseUsuarioRepository implements UsuarioRepository {
   async update(id: string, cambios: UsuarioUpdate): Promise<User> {
     const { data, error } = await this.client
       .from('usuarios')
-      .update({ ...cambios, actualizado_en: new Date().toISOString() })
+      .update(cambios)
       .eq('id', id)
       .select()
       .single();
@@ -209,7 +206,7 @@ export class SupabaseConversacionRepository implements ConversacionRepository {
   async update(id: string, cambios: ConversacionUpdate): Promise<Conversation> {
     const { data, error } = await this.client
       .from('conversaciones')
-      .update({ ...cambios, actualizado_en: new Date().toISOString() })
+      .update(cambios)
       .eq('id', id)
       .select()
       .single();
