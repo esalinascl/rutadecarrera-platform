@@ -9,9 +9,12 @@
 -- Qué hace:
 --   1. Agrega `usuarios.rol` (cliente | consultor | admin), por defecto "cliente".
 --   2. Enlaza `usuarios.id` con `auth.users(id)` (sin usuarios "fantasma").
---   3. Crea la fila en `usuarios` automáticamente al registrarse (trigger).
---   4. Recorta los privilegios abiertos que Supabase da por defecto.
---   5. Crea las políticas RLS: cada usuario solo accede a lo suyo.
+--   3. Crea la fila en `usuarios` al registrarse y mantiene su email al día
+--      cuando cambia en `auth.users` (triggers).
+--   4. Marca `actualizado_en` automáticamente al editar (trigger).
+--   5. Recorta los privilegios abiertos que Supabase da por defecto, también
+--      para las tablas que se creen en el futuro.
+--   6. Crea las políticas RLS: cada usuario solo accede a lo suyo.
 --
 -- Defensa en dos capas:
 --   - RLS decide QUÉ FILAS ve/toca cada usuario.
@@ -22,9 +25,14 @@
 -- sistema: créditos, pagos, administración).
 --
 -- No cambia datos: las 4 tablas están vacías en staging y producción.
--- Repetible: se puede ejecutar más de una vez sin error ni duplicados.
+-- Repetible: se puede ejecutar más de una vez sin error ni duplicados, incluso
+-- por un rol que no es dueño de `auth.users` (por eso el trigger sobre esa
+-- tabla se crea solo si no existe, en vez de DROP + CREATE).
+-- Atómica: va dentro de una transacción; si algo falla, no queda a medias.
 -- Orden de despliegue: primero STAGING, verificar, y recién después PRODUCCIÓN.
 -- ============================================================================
+
+BEGIN;
 
 -- ----------------------------------------------------------------------------
 -- 1. Rol del usuario (AD-9 → A)
@@ -34,7 +42,7 @@ ALTER TABLE usuarios
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usuarios_rol_check') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usuarios_rol_check' AND conrelid = 'public.usuarios'::regclass) THEN
     ALTER TABLE usuarios
       ADD CONSTRAINT usuarios_rol_check CHECK (rol IN ('cliente', 'consultor', 'admin'));
   END IF;
@@ -48,7 +56,7 @@ $$;
 -- llaves de la migración 001, también sus conversaciones, mensajes y análisis.
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usuarios_id_auth_fkey') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usuarios_id_auth_fkey' AND conrelid = 'public.usuarios'::regclass) THEN
     ALTER TABLE usuarios
       ADD CONSTRAINT usuarios_id_auth_fkey
       FOREIGN KEY (id) REFERENCES auth.users (id) ON DELETE CASCADE;
@@ -57,13 +65,17 @@ END
 $$;
 
 -- ----------------------------------------------------------------------------
--- 3. Alta automática en `usuarios` al registrarse
+-- 3. Alta automática en `usuarios` y email al día
 -- ----------------------------------------------------------------------------
--- SECURITY DEFINER: corre con los privilegios de su dueño, porque quien se
--- registra todavía no tiene (ni debe tener) permiso de INSERT en `usuarios`.
--- Por eso fija `search_path` (evita que alguien "suplante" una tabla o función).
--- El rol SIEMPRE es "cliente": se ignora cualquier "rol" que venga en los
--- metadatos del registro, que el propio usuario controla.
+-- Las funciones son SECURITY DEFINER: corren con los privilegios de su dueño,
+-- porque quien dispara el trigger (el servicio de Auth) no tiene ni debe tener
+-- permiso sobre `usuarios`. Por eso fijan `search_path` (evita que alguien
+-- "suplante" una tabla o función) y ninguna es invocable desde la API.
+
+-- Alta: el rol SIEMPRE es "cliente" (se ignora cualquier "rol" de los metadatos,
+-- que el propio usuario controla). Un registro sin email se rechaza con un
+-- mensaje claro: hoy solo existe acceso por Magic Link, que siempre trae email.
+-- Si se habilita otro método (teléfono, anónimo) hay que revisar `usuarios.email`.
 CREATE OR REPLACE FUNCTION public.crear_usuario_al_registrarse()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -71,11 +83,20 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
+  IF NEW.email IS NULL OR btrim(NEW.email) = '' THEN
+    RAISE EXCEPTION 'No se puede registrar un usuario sin email: la plataforma solo admite acceso por Magic Link'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
   INSERT INTO public.usuarios (id, email, nombre, rol)
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NULLIF(btrim(NEW.raw_user_meta_data ->> 'nombre'), ''), split_part(NEW.email, '@', 1)),
+    -- `nombre` es VARCHAR(255): se recorta para no romper el registro.
+    left(
+      COALESCE(NULLIF(btrim(NEW.raw_user_meta_data ->> 'nombre'), ''), split_part(NEW.email, '@', 1)),
+      255
+    ),
     'cliente'
   )
   ON CONFLICT (id) DO NOTHING;
@@ -83,13 +104,84 @@ BEGIN
 END;
 $$;
 
--- Nadie puede invocar la función a mano; solo la ejecuta el trigger.
-REVOKE ALL ON FUNCTION public.crear_usuario_al_registrarse() FROM PUBLIC;
+-- Email al día: si cambia en `auth.users`, `usuarios.email` lo sigue. Sin esto
+-- quedaría desactualizado y el email viejo, ya libre en Auth, haría fallar el
+-- registro de otra persona por la restricción UNIQUE de `usuarios`.
+CREATE OR REPLACE FUNCTION public.sincronizar_email_usuario()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  UPDATE public.usuarios SET email = NEW.email WHERE id = NEW.id;
+  RETURN NEW;
+END;
+$$;
 
-DROP TRIGGER IF EXISTS al_registrarse_crear_usuario ON auth.users;
-CREATE TRIGGER al_registrarse_crear_usuario
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.crear_usuario_al_registrarse();
+-- Nadie las invoca a mano ni desde la API: solo las ejecutan los triggers.
+-- (`REVOKE ... FROM PUBLIC` no basta: Supabase da EXECUTE explícito a estos roles.)
+REVOKE ALL ON FUNCTION public.crear_usuario_al_registrarse()
+  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.sincronizar_email_usuario()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+-- Los triggers sobre `auth.users` se crean solo si no existen: `DROP TRIGGER`
+-- exige ser dueño de la tabla, y quien migra (`postgres`) no lo es.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'al_registrarse_crear_usuario'
+      AND tgrelid = 'auth.users'::regclass AND NOT tgisinternal
+  ) THEN
+    CREATE TRIGGER al_registrarse_crear_usuario
+      AFTER INSERT ON auth.users
+      FOR EACH ROW EXECUTE FUNCTION public.crear_usuario_al_registrarse();
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'al_cambiar_email_sincronizar_usuario'
+      AND tgrelid = 'auth.users'::regclass AND NOT tgisinternal
+  ) THEN
+    CREATE TRIGGER al_cambiar_email_sincronizar_usuario
+      AFTER UPDATE OF email ON auth.users
+      FOR EACH ROW
+      WHEN (NEW.email IS NOT NULL AND NEW.email IS DISTINCT FROM OLD.email)
+      EXECUTE FUNCTION public.sincronizar_email_usuario();
+  END IF;
+END
+$$;
+
+-- ----------------------------------------------------------------------------
+-- 3b. `actualizado_en` lo marca la base
+-- ----------------------------------------------------------------------------
+-- El navegador no puede escribir esa columna (no tiene GRANT), así que no puede
+-- falsearla; la base la actualiza sola en cada UPDATE.
+CREATE OR REPLACE FUNCTION public.marcar_actualizado_en()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  NEW.actualizado_en := now();
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.marcar_actualizado_en()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS antes_de_editar_marcar_fecha ON usuarios;
+CREATE TRIGGER antes_de_editar_marcar_fecha
+  BEFORE UPDATE ON usuarios
+  FOR EACH ROW EXECUTE FUNCTION public.marcar_actualizado_en();
+
+DROP TRIGGER IF EXISTS antes_de_editar_marcar_fecha ON conversaciones;
+CREATE TRIGGER antes_de_editar_marcar_fecha
+  BEFORE UPDATE ON conversaciones
+  FOR EACH ROW EXECUTE FUNCTION public.marcar_actualizado_en();
 
 -- ----------------------------------------------------------------------------
 -- 4. Privilegios: cerrar lo que Supabase deja abierto por defecto
@@ -98,6 +190,14 @@ CREATE TRIGGER al_registrarse_crear_usuario
 -- y service_role. Se revoca para anon y authenticated y se otorga SOLO lo
 -- necesario, por columna cuando corresponde. `anon` queda sin nada.
 REVOKE ALL ON usuarios, conversaciones, mensajes, analisis FROM anon, authenticated;
+
+-- Lo mismo para las tablas y secuencias que se creen EN EL FUTURO por quien
+-- migra: nacen cerradas para anon y authenticated. Cada tabla nueva debe traer
+-- su propio GRANT, su RLS y sus políticas (y su test). `service_role` conserva
+-- los privilegios por defecto. No se tocan las funciones futuras a propósito:
+-- quien cree una función para usarla desde la API debe decidir su EXECUTE.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
 
 GRANT SELECT ON usuarios, conversaciones, mensajes, analisis TO authenticated;
 
@@ -186,3 +286,5 @@ DROP POLICY IF EXISTS analisis_crear_propios ON analisis;
 CREATE POLICY analisis_crear_propios ON analisis
   FOR INSERT TO authenticated
   WITH CHECK (usuario_id = (SELECT auth.uid()));
+
+COMMIT;

@@ -12,6 +12,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  aplicarComoMigrador,
   comoIdentidad,
   crearBaseConMigraciones,
   leerMigracion,
@@ -28,12 +29,20 @@ const anonimo: Identidad = { rol: 'anon' };
 const sistema: Identidad = { rol: 'service_role' };
 /** Rol `authenticated` pero sin sesión válida (JWT sin "sub"). */
 const sinSesion: Identidad = { rol: 'authenticated' };
+/** Quien inserta/actualiza `auth.users` en Supabase real y dispara los triggers. */
+const authAdmin: Identidad = { rol: 'supabase_auth_admin' };
 
 const MIGRACIONES = ['001_init_schema.sql', '003_auth_rls.sql'];
 const TABLAS = ['usuarios', 'conversaciones', 'mensajes', 'analisis'] as const;
 
-/** Mensajes de error de Postgres cuando RLS o los privilegios bloquean. */
-const BLOQUEADO = /permission denied|row-level security|violates/i;
+/**
+ * Cuando RLS o los privilegios bloquean, Postgres responde SQLSTATE 42501
+ * (insufficient_privilege), tanto para «permission denied» como para «new row
+ * violates row-level security policy». Se exige ESE código y no un texto
+ * genérico, para que un error de otro tipo (llave foránea, CHECK...) no pase
+ * por un bloqueo de seguridad.
+ */
+const BLOQUEADO = { code: '42501' };
 
 let db: PGlite;
 
@@ -191,7 +200,7 @@ describe('Aislamiento entre usuarios: escritura (AD-10 → B1)', () => {
   it('A NO puede crear una conversación a nombre de B', async () => {
     await expect(
       comoIdentidad(db, comoA, `INSERT INTO conversaciones (usuario_id) VALUES ($1)`, [USUARIO_B])
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
   });
 
   it('A puede escribir un mensaje en su conversación', async () => {
@@ -212,7 +221,7 @@ describe('Aislamiento entre usuarios: escritura (AD-10 → B1)', () => {
         `INSERT INTO mensajes (conversacion_id, rol, contenido) VALUES ($1, 'user', 'intruso')`,
         [CONV_B]
       )
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
   });
 
   it('A NO puede escribir `tokens_usage` (campo de consumo: solo el sistema)', async () => {
@@ -223,7 +232,7 @@ describe('Aislamiento entre usuarios: escritura (AD-10 → B1)', () => {
         `INSERT INTO mensajes (conversacion_id, rol, contenido, tokens_usage) VALUES ($1, 'user', 'x', 0)`,
         [CONV_A]
       )
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
   });
 
   it('A puede crear un análisis propio pero NO uno a nombre de B', async () => {
@@ -239,7 +248,7 @@ describe('Aislamiento entre usuarios: escritura (AD-10 → B1)', () => {
       comoIdentidad(db, comoA, `INSERT INTO analisis (usuario_id, tipo) VALUES ($1, 'x')`, [
         USUARIO_B,
       ])
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
   });
 
   it('A puede cambiar el título de su conversación pero NO el de la de B', async () => {
@@ -264,7 +273,7 @@ describe('Aislamiento entre usuarios: escritura (AD-10 → B1)', () => {
         USUARIO_B,
         CONV_A,
       ])
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
   });
 
   it('A puede actualizar su nombre pero NO el de B', async () => {
@@ -286,17 +295,17 @@ describe('Aislamiento entre usuarios: escritura (AD-10 → B1)', () => {
   it('A NO puede cambiar su email ni su id en `usuarios`', async () => {
     await expect(
       comoIdentidad(db, comoA, `UPDATE usuarios SET email = 'otro@e.cl' WHERE id = $1`, [USUARIO_A])
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
     await expect(
       comoIdentidad(db, comoA, `UPDATE usuarios SET id = gen_random_uuid() WHERE id = $1`, [
         USUARIO_A,
       ])
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
   });
 
   it('A NO puede borrar nada (conversaciones, mensajes, análisis ni su fila)', async () => {
     for (const tabla of TABLAS) {
-      await expect(comoIdentidad(db, comoA, `DELETE FROM ${tabla}`)).rejects.toThrow(BLOQUEADO);
+      await expect(comoIdentidad(db, comoA, `DELETE FROM ${tabla}`)).rejects.toMatchObject(BLOQUEADO);
     }
   });
 
@@ -305,7 +314,7 @@ describe('Aislamiento entre usuarios: escritura (AD-10 → B1)', () => {
       comoIdentidad(db, comoA, `INSERT INTO usuarios (id, email, nombre) VALUES ($1, 'z@e.cl', 'Z')`, [
         USUARIO_A,
       ])
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
   });
 });
 
@@ -316,7 +325,7 @@ describe('Nadie se sube de rol (AD-9 → A)', () => {
         rolDeseado,
         USUARIO_A,
       ])
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
 
     const { rows } = await db.query<{ rol: string }>(`SELECT rol FROM usuarios WHERE id = $1`, [
       USUARIO_A,
@@ -327,7 +336,7 @@ describe('Nadie se sube de rol (AD-9 → A)', () => {
   it('A NO puede cambiar el rol de B', async () => {
     await expect(
       comoIdentidad(db, comoA, `UPDATE usuarios SET rol = 'admin' WHERE id = $1`, [USUARIO_B])
-    ).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
   });
 
   it('el sistema (service_role) SÍ puede cambiar un rol', async () => {
@@ -343,17 +352,15 @@ describe('Nadie se sube de rol (AD-9 → A)', () => {
 
 describe('Sin política = sin acceso: anon (sin sesión)', () => {
   it.each(TABLAS)('anon no puede leer %s', async (tabla) => {
-    await expect(comoIdentidad(db, anonimo, `SELECT * FROM ${tabla}`)).rejects.toThrow(BLOQUEADO);
+    await expect(comoIdentidad(db, anonimo, `SELECT * FROM ${tabla}`)).rejects.toMatchObject(BLOQUEADO);
   });
 
   it('anon no puede insertar ni modificar nada', async () => {
     await expect(
       comoIdentidad(db, anonimo, `INSERT INTO conversaciones (usuario_id) VALUES ($1)`, [USUARIO_A])
-    ).rejects.toThrow(BLOQUEADO);
-    await expect(comoIdentidad(db, anonimo, `UPDATE usuarios SET nombre = 'x'`)).rejects.toThrow(
-      BLOQUEADO
-    );
-    await expect(comoIdentidad(db, anonimo, `DELETE FROM mensajes`)).rejects.toThrow(BLOQUEADO);
+    ).rejects.toMatchObject(BLOQUEADO);
+    await expect(comoIdentidad(db, anonimo, `UPDATE usuarios SET nombre = 'x'`)).rejects.toMatchObject(BLOQUEADO);
+    await expect(comoIdentidad(db, anonimo, `DELETE FROM mensajes`)).rejects.toMatchObject(BLOQUEADO);
   });
 });
 
@@ -375,12 +382,157 @@ describe('Operaciones de sistema: service_role', () => {
   });
 });
 
+describe('Registro real: lo dispara supabase_auth_admin', () => {
+  it('crea la fila en `usuarios` con rol "cliente"', async () => {
+    const id = '55555555-5555-4555-8555-555555555555';
+    await comoIdentidad(db, authAdmin, `INSERT INTO auth.users (id, email) VALUES ($1, 'real@ejemplo.cl')`, [id]);
+    const { rows } = await db.query<{ rol: string }>(`SELECT rol FROM usuarios WHERE id = $1`, [id]);
+    expect(rows).toEqual([{ rol: 'cliente' }]);
+  });
+
+  it('rechaza con un mensaje claro un registro sin email (solo se admite Magic Link)', async () => {
+    await expect(
+      comoIdentidad(db, authAdmin, `INSERT INTO auth.users (id, email) VALUES (gen_random_uuid(), NULL)`)
+    ).rejects.toThrow(/sin email/i);
+  });
+
+  it('recorta a 255 caracteres un nombre más largo en vez de romper el registro', async () => {
+    const id = '66666666-6666-4666-8666-666666666666';
+    await comoIdentidad(
+      db,
+      authAdmin,
+      `INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES ($1, 'largo@ejemplo.cl', $2)`,
+      [id, JSON.stringify({ nombre: 'N'.repeat(300) })]
+    );
+    const { rows } = await db.query<{ largo: number }>(
+      `SELECT length(nombre)::int AS largo FROM usuarios WHERE id = $1`,
+      [id]
+    );
+    expect(rows[0]?.largo).toBe(255);
+  });
+});
+
+describe('El email de `usuarios` sigue al de auth.users', () => {
+  it('al cambiar el email en auth, se actualiza en `usuarios`', async () => {
+    await comoIdentidad(db, authAdmin, `UPDATE auth.users SET email = 'nuevo-a@ejemplo.cl' WHERE id = $1`, [
+      USUARIO_A,
+    ]);
+    const { rows } = await db.query<{ email: string }>(`SELECT email FROM usuarios WHERE id = $1`, [
+      USUARIO_A,
+    ]);
+    expect(rows[0]?.email).toBe('nuevo-a@ejemplo.cl');
+  });
+
+  it('el email viejo queda libre: otra persona puede registrarse con él', async () => {
+    await comoIdentidad(db, authAdmin, `UPDATE auth.users SET email = 'nuevo-a@ejemplo.cl' WHERE id = $1`, [
+      USUARIO_A,
+    ]);
+    const { rows } = await comoIdentidad(
+      db,
+      authAdmin,
+      `INSERT INTO auth.users (id, email) VALUES (gen_random_uuid(), 'a@ejemplo.cl') RETURNING id`
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('quitar el email en auth no rompe ni borra el de `usuarios`', async () => {
+    await comoIdentidad(db, authAdmin, `UPDATE auth.users SET email = NULL WHERE id = $1`, [USUARIO_A]);
+    const { rows } = await db.query<{ email: string }>(`SELECT email FROM usuarios WHERE id = $1`, [
+      USUARIO_A,
+    ]);
+    expect(rows[0]?.email).toBe('a@ejemplo.cl');
+  });
+});
+
+describe('`actualizado_en` lo marca la base, no el cliente', () => {
+  const ANTIGUA = '2000-01-01T00:00:00Z';
+
+  it('al editar el nombre se actualiza `usuarios.actualizado_en`', async () => {
+    await db.query(`UPDATE usuarios SET actualizado_en = $1 WHERE id = $2`, [ANTIGUA, USUARIO_A]);
+    await comoIdentidad(db, comoA, `UPDATE usuarios SET nombre = 'Otro nombre' WHERE id = $1`, [USUARIO_A]);
+    const { rows } = await db.query<{ reciente: boolean }>(
+      `SELECT actualizado_en > now() - interval '1 day' AS reciente FROM usuarios WHERE id = $1`,
+      [USUARIO_A]
+    );
+    expect(rows[0]?.reciente).toBe(true);
+  });
+
+  it('al renombrar una conversación se actualiza `conversaciones.actualizado_en`', async () => {
+    await db.query(`UPDATE conversaciones SET actualizado_en = $1 WHERE id = $2`, [ANTIGUA, CONV_A]);
+    await comoIdentidad(db, comoA, `UPDATE conversaciones SET titulo = 'Otro título' WHERE id = $1`, [CONV_A]);
+    const { rows } = await db.query<{ reciente: boolean }>(
+      `SELECT actualizado_en > now() - interval '1 day' AS reciente FROM conversaciones WHERE id = $1`,
+      [CONV_A]
+    );
+    expect(rows[0]?.reciente).toBe(true);
+  });
+
+  it('A NO puede escribir `actualizado_en` a mano (ni falsearlo)', async () => {
+    await expect(
+      comoIdentidad(db, comoA, `UPDATE conversaciones SET actualizado_en = $1 WHERE id = $2`, [ANTIGUA, CONV_A])
+    ).rejects.toMatchObject(BLOQUEADO);
+    await expect(
+      comoIdentidad(db, comoA, `UPDATE usuarios SET actualizado_en = $1 WHERE id = $2`, [ANTIGUA, USUARIO_A])
+    ).rejects.toMatchObject(BLOQUEADO);
+  });
+});
+
+describe('Funciones de la migración: nadie las invoca desde la API', () => {
+  it.each([
+    'crear_usuario_al_registrarse',
+    'sincronizar_email_usuario',
+    'marcar_actualizado_en',
+  ])('%s no es ejecutable por anon, authenticated ni service_role', async (funcion) => {
+    const { rows } = await db.query<{ rol: string; puede: boolean }>(
+      `SELECT r AS rol, has_function_privilege(r, p.oid, 'EXECUTE') AS puede
+         FROM pg_proc p, unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r
+        WHERE p.proname = $1 AND p.pronamespace = 'public'::regnamespace`,
+      [funcion]
+    );
+    expect(rows).toHaveLength(3);
+    for (const fila of rows) {
+      expect(fila.puede, `${funcion} ejecutable por ${fila.rol}`).toBe(false);
+    }
+  });
+
+  it('las funciones SECURITY DEFINER fijan su search_path', async () => {
+    const { rows } = await db.query<{ proname: string; proconfig: string[] | null }>(
+      `SELECT proname, proconfig FROM pg_proc
+        WHERE prosecdef AND pronamespace = 'public'::regnamespace`
+    );
+    expect(rows.map((r) => r.proname).sort()).toEqual([
+      'crear_usuario_al_registrarse',
+      'sincronizar_email_usuario',
+    ]);
+    for (const fila of rows) {
+      expect(fila.proconfig?.join(','), fila.proname).toMatch(/search_path/);
+    }
+  });
+});
+
+describe('Tablas futuras nacen cerradas', () => {
+  it('una tabla nueva no da privilegios a anon ni authenticated, pero sí a service_role', async () => {
+    await aplicarComoMigrador(db, `CREATE TABLE public.tabla_futura (id INT PRIMARY KEY);`);
+    const { rows } = await db.query<{ rol: string; privilegio: string; puede: boolean }>(
+      `SELECT r AS rol, p AS privilegio, has_table_privilege(r, 'public.tabla_futura', p) AS puede
+         FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r,
+              unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) AS p`
+    );
+    for (const fila of rows) {
+      const esperado = fila.rol === 'service_role';
+      expect(fila.puede, `${fila.rol} ${fila.privilegio}`).toBe(esperado);
+    }
+  });
+});
+
 describe('Higiene de la migración 003', () => {
   it('es repetible: aplicarla dos veces no falla ni duplica políticas', async () => {
     const antes = await db.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM pg_policies WHERE schemaname = 'public'`
     );
-    await db.exec(leerMigracion('003_auth_rls.sql'));
+    // Con el mismo rol no superusuario y no dueño de auth.users que usa la
+    // primera vez: así se detecta un "must be owner of relation users".
+    await aplicarComoMigrador(db, leerMigracion('003_auth_rls.sql'));
     const despues = await db.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM pg_policies WHERE schemaname = 'public'`
     );

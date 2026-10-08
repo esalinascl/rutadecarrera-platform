@@ -132,22 +132,22 @@ describe('Repositorios', () => {
     const { client } = supabaseSimulado({ data: null, error: { message: 'duplicate key' } });
     const { usuarios } = crearRepositorios(client);
 
-    await expect(
-      usuarios.create({ email: 'ana@example.com', nombre: 'Ana', contexto_inicial: null })
-    ).rejects.toThrow(/usuarios\.create.*duplicate key/);
+    await expect(usuarios.findById('u-1')).rejects.toThrow(/usuarios\.findById.*duplicate key/);
   });
 
-  it('update marca actualizado_en con la fecha actual en ISO', async () => {
+  it('update envía solo los cambios: `actualizado_en` lo marca la base (migración 003)', async () => {
     const { client, llamadas } = supabaseSimulado({ data: USUARIO, error: null });
     const { usuarios } = crearRepositorios(client);
 
     await usuarios.update('u-1', { nombre: 'Ana María' });
 
     const [, [cambios]] = llamadas.find(([metodo]) => metodo === 'update')!;
-    expect(cambios).toMatchObject({ nombre: 'Ana María' });
-    expect((cambios as { actualizado_en: string }).actualizado_en).toMatch(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
-    );
+    expect(cambios).toEqual({ nombre: 'Ana María' });
+  });
+
+  it('los usuarios no se crean desde el repositorio: nacen al registrarse en Auth', () => {
+    const { client } = supabaseSimulado({ data: USUARIO, error: null });
+    expect(crearRepositorios(client).usuarios).not.toHaveProperty('create');
   });
 
   it('el historial de mensajes se pide en orden cronológico ascendente', async () => {
@@ -186,8 +186,6 @@ type Operacion = {
 const FILA = { id: 'x-1' };
 
 const OPERACIONES: Operacion[] = [
-  { nombre: 'usuarios.create', tabla: 'usuarios', esperado: 'fila',
-    ejecutar: (r) => r.usuarios.create({ email: 'a@b.cl', nombre: 'Ana', contexto_inicial: null }) },
   { nombre: 'usuarios.findById', tabla: 'usuarios', esperado: 'fila',
     ejecutar: (r) => r.usuarios.findById('x-1') },
   { nombre: 'usuarios.findByEmail', tabla: 'usuarios', esperado: 'fila',
@@ -244,12 +242,12 @@ describe('Repositorios: todas las operaciones', () => {
     await expect(promesa).rejects.toMatchObject({ operacion: op.nombre, codigo: 'XX000' });
   });
 
-  it('las actualizaciones de conversaciones también marcan actualizado_en', async () => {
+  it('las actualizaciones de conversaciones tampoco envían actualizado_en (lo marca la base)', async () => {
     const { client, llamadas } = supabaseSimulado({ data: FILA, error: null });
 
     await crearRepositorios(client).conversaciones.update('x-1', { titulo: 'Nuevo' });
 
     const [, [cambios]] = llamadas.find(([metodo]) => metodo === 'update')!;
-    expect(cambios).toHaveProperty('actualizado_en');
+    expect(cambios).toEqual({ titulo: 'Nuevo' });
   });
 });

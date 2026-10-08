@@ -6,7 +6,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   userSchema,
-  createUserSchema,
   messageSchema,
   chatRequestSchema,
   chatResponseSchema,
@@ -107,25 +106,6 @@ describe('Validation - Schemas', () => {
       };
 
       expect(() => userSchema.parse(usuario)).toThrow();
-    });
-  });
-
-  describe('createUserSchema', () => {
-    it('debe validar crear usuario sin id y timestamps', () => {
-      const datos = {
-        email: 'test@example.com',
-        nombre: 'Juan Pérez',
-      };
-
-      expect(() => createUserSchema.parse(datos)).not.toThrow();
-    });
-
-    it('debe rechazar si falta email', () => {
-      const datos = {
-        nombre: 'Juan Pérez',
-      };
-
-      expect(() => createUserSchema.parse(datos)).toThrow();
     });
   });
 

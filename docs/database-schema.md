@@ -83,8 +83,8 @@ Hay **dos capas** y las dos son necesarias:
 
 | Tabla | Leer | Crear | Modificar | Borrar |
 |---|---|---|---|---|
-| `usuarios` | Su fila | — (la crea el trigger al registrarse) | Solo `nombre` y `contexto_inicial` | — |
-| `conversaciones` | Las suyas | Con su `usuario_id` (`usuario_id`, `titulo`) | Solo `titulo` | — |
+| `usuarios` | Su fila | — (la crea el trigger al registrarse) | Solo `nombre` y `contexto_inicial` (`actualizado_en` lo marca la base) | — |
+| `conversaciones` | Las suyas | Con su `usuario_id` (`usuario_id`, `titulo`) | Solo `titulo` (`actualizado_en` lo marca la base) | — |
 | `mensajes` | Los de sus conversaciones | En sus conversaciones (`conversacion_id`, `rol`, `contenido`) — **no** `tokens_usage` | — | — |
 | `analisis` | Los suyos | Con su `usuario_id` | — | — |
 
@@ -94,10 +94,21 @@ Hay **dos capas** y las dos son necesarias:
 
 Al crearse una cuenta en `auth.users`, el trigger `al_registrarse_crear_usuario` crea la fila en `usuarios` con rol **`cliente`**. Ignora cualquier `rol` que venga en los metadatos del registro (los controla el usuario). Para subir a alguien a `consultor` o `admin` hay que usar `service_role` o el SQL Editor.
 
+- **Sin email no hay registro:** se rechaza con un mensaje claro. Hoy solo existe acceso por Magic Link, que siempre trae email; si se habilita teléfono o acceso anónimo hay que revisar `usuarios.email`.
+- **Nombre:** viene de los metadatos o de la parte local del email, recortado a 255 caracteres.
+- **Email al día:** si cambia en `auth.users`, el trigger `al_cambiar_email_sincronizar_usuario` lo copia a `usuarios.email`.
+- **Los usuarios no se crean desde el código**, por eso `UsuarioRepository` no tiene `create`. Tampoco hay que borrar solo `usuarios.id`: la cuenta vive en `auth.users` (borrarla elimina en cascada todo lo del usuario).
+
+### Funciones y tablas futuras
+
+- Las 3 funciones de la migración (`crear_usuario_al_registrarse`, `sincronizar_email_usuario`, `marcar_actualizado_en`) **no son ejecutables** por `anon`, `authenticated` ni `service_role`: solo las disparan los triggers.
+- Las **tablas y secuencias nuevas** que cree quien migra nacen **sin privilegios** para `anon` y `authenticated`. Cada tabla nueva debe traer su `GRANT`, su RLS y sus políticas (con test). Las **funciones** nuevas no se tocaron: quien cree una para usarla desde la API debe decidir su `EXECUTE`.
+
 ### Puntos abiertos (se resuelven en su TASK)
 
 - `mensajes.rol` (`user`/`assistant`): hoy el usuario puede insertar ambos valores en sus propias conversaciones. La TASK 7/12 decide si las respuestas del asistente se escriben solo con `service_role`.
 - Acceso del consultor a sus clientes (AD-10 → B2): no existe aún.
+- `analisis.tipo` y `analisis.resultado` los escribe libremente el dueño: si algún día se factura o se rankea con ellos, la escritura debe pasar a `service_role`.
 
 ## Aplicar la migración
 
@@ -105,7 +116,7 @@ La migración es repetible (`IF NOT EXISTS`): ejecutarla dos veces no rompe nada
 
 1. Supabase → proyecto **staging** → SQL Editor.
 2. Pegar el contenido de la migración y ejecutar (`001` si la base está vacía; luego `003`).
-3. Verificar: 4 tablas con RLS activo, columna `usuarios.rol`, 9 políticas y el trigger `al_registrarse_crear_usuario`.
+3. Verificar: 4 tablas con RLS activo, columna `usuarios.rol`, 9 políticas y los 3 triggers nuevos. Ejecutarla **dos veces** (es repetible) y revisar el linter de seguridad de Supabase.
 4. Repetir en **producción** solo después de mergear a `main` y con autorización explícita de Eduardo.
 
 Las pruebas automáticas de RLS (`rls.test.ts`) corren sobre Postgres en memoria (PGlite) con un Supabase emulado, así que **no reemplazan** la verificación en staging.
@@ -120,4 +131,4 @@ const repos = crearRepositorios(crearClienteSupabase(leerConfigSupabase()));
 const historial = await repos.mensajes.findByConversacionId(conversacionId); // orden cronológico
 ```
 
-Todo error de Supabase se lanza como `DatabaseError` con la operación que falló (`usuarios.create`, etc.). Ninguno se silencia.
+Todo error de Supabase se lanza como `DatabaseError` con la operación que falló (`usuarios.update`, etc.). Ninguno se silencia.

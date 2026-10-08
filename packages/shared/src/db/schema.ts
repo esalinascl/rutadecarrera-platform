@@ -72,10 +72,11 @@ export type NombreTabla = keyof typeof COLUMNAS_POR_TABLA;
 type Generados = 'id' | 'creado_en' | 'actualizado_en';
 
 /**
- * `rol` nunca se envía al crear ni al actualizar un usuario: nace "cliente"
- * por defecto y solo `service_role` lo cambia (AD-9 → A, migración 003).
+ * Los usuarios NO se crean desde aquí: nacen cuando alguien se registra en
+ * Supabase Auth y un trigger crea su fila (migración 003). Por eso no hay
+ * `UsuarioCreate`. `rol` tampoco se actualiza desde aquí: nace "cliente" y solo
+ * `service_role` lo cambia (AD-9 → A).
  */
-export type UsuarioCreate = Omit<User, Generados | 'rol'>;
 export type UsuarioUpdate = Partial<Omit<User, Generados | 'rol'>>;
 
 export type ConversacionCreate = Omit<Conversation, Generados>;
@@ -98,7 +99,6 @@ export interface DatabaseClient {
 }
 
 export interface UsuarioRepository {
-  create(usuario: UsuarioCreate): Promise<User>;
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
   update(id: string, data: UsuarioUpdate): Promise<User>;
