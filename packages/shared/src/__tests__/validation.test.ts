@@ -50,9 +50,24 @@ describe('Validation - Schemas', () => {
         contexto_inicial: null,
         creado_en: FECHA_ISO,
         actualizado_en: FECHA_ISO,
+        rol: 'cliente',
       };
 
       expect(() => userSchema.parse(usuario)).not.toThrow();
+    });
+
+    it('debe rechazar un rol que no sea cliente, consultor o admin', () => {
+      const usuario = {
+        id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        email: 'test@example.com',
+        nombre: 'Juan Pérez',
+        contexto_inicial: null,
+        creado_en: FECHA_ISO,
+        actualizado_en: FECHA_ISO,
+        rol: 'superusuario',
+      };
+
+      expect(() => userSchema.parse(usuario)).toThrow(/Rol inválido/);
     });
 
     it('debe rechazar email inválido', () => {
@@ -300,6 +315,7 @@ describe('Validation - Helper Functions', () => {
         contexto_inicial: null,
         creado_en: FECHA_ISO,
         actualizado_en: FECHA_ISO,
+        rol: 'cliente',
       };
 
       const resultado = validateUser(usuario);
@@ -345,6 +361,7 @@ describe('Validation - Helper Functions', () => {
         contexto_inicial: null,
         creado_en: FECHA_ISO,
         actualizado_en: FECHA_ISO,
+        rol: 'cliente',
       };
 
       const resultado = safeValidate(usuario, userSchema);
@@ -411,6 +428,7 @@ describe('Validation - Helper Functions', () => {
         contexto_inicial: null,
         creado_en: FECHA_ISO,
         actualizado_en: FECHA_ISO,
+        rol: 'cliente',
       };
 
       const mensaje = {
@@ -441,6 +459,7 @@ describe('Validation - Helper Functions', () => {
         contexto_inicial: null,
         creado_en: FECHA_ISO,
         actualizado_en: FECHA_ISO,
+        rol: 'cliente',
       };
 
       const resultados = await validateMany([

@@ -57,6 +57,7 @@ export const userSchema = z.object({
   contexto_inicial: contextoSchema.nullable(),
   creado_en: fechaIso,
   actualizado_en: fechaIso,
+  rol: z.enum(['cliente', 'consultor', 'admin'], { message: 'Rol inválido' }),
 }).strict() satisfies Esquema<User>;
 
 /**
