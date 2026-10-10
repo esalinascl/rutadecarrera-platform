@@ -10,10 +10,10 @@
 version: 2
 updates:
   - package-ecosystem: "npm" # cubre pnpm (pnpm-lock.yaml y catálogo)
-    directories:
-      - "/"
-      - "/apps/web"
-      - "/packages/shared"
+    # Solo la raíz (2026-10-10): en un workspace pnpm el lockfile vive en "/".
+    # Vigilar /apps/web y /packages/shared por separado generaba PRs duplicados
+    # que no actualizaban el lockfile y fallaban con ERR_PNPM_OUTDATED_LOCKFILE.
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -22,6 +22,10 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # zod 3 → 4 es un cambio mayor: se migra como tarea planificada, no por PR automático.
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
     groups:
       # Next.js y su config de ESLint se actualizan juntos (misma versión).
       next:
