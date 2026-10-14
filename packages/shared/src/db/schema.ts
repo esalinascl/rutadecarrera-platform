@@ -2,7 +2,8 @@
  * @file db/schema.ts
  * @description Contratos de la capa de datos (Supabase PostgreSQL).
  *
- * FUENTE ÚNICA DE VERDAD DEL ESQUEMA: `migrations/001_init_schema.sql`.
+ * FUENTE ÚNICA DE VERDAD DEL ESQUEMA: las migraciones en `migrations/`
+ * (001 crea las tablas; 003 agrega `usuarios.rol`).
  * Las entidades (User, Conversation, Message, Analysis) están en `types/index.ts`
  * y reflejan esas tablas columna por columna. `COLUMNAS_POR_TABLA` es el puente
  * que el test `db-schema.test.ts` compara contra el SQL: si alguien agrega,
@@ -29,7 +30,10 @@ function columnas<T>() {
   ): ColumnasExactas<T> => lista;
 }
 
-/** Columnas de cada tabla, en el mismo orden que la migración SQL. */
+/**
+ * Columnas de cada tabla, en el mismo orden que las migraciones SQL: primero
+ * las del CREATE TABLE y después las de cada ADD COLUMN, por número de migración.
+ */
 export const COLUMNAS_POR_TABLA = {
   usuarios: columnas<User>()([
     'id',
@@ -38,6 +42,7 @@ export const COLUMNAS_POR_TABLA = {
     'contexto_inicial',
     'creado_en',
     'actualizado_en',
+    'rol',
   ]),
   conversaciones: columnas<Conversation>()([
     'id',
@@ -66,8 +71,13 @@ export type NombreTabla = keyof typeof COLUMNAS_POR_TABLA;
 /** Campos que la base genera sola (no se envían al crear). */
 type Generados = 'id' | 'creado_en' | 'actualizado_en';
 
-export type UsuarioCreate = Omit<User, Generados>;
-export type UsuarioUpdate = Partial<Omit<User, Generados>>;
+/**
+ * Los usuarios NO se crean desde aquí: nacen cuando alguien se registra en
+ * Supabase Auth y un trigger crea su fila (migración 003). Por eso no hay
+ * `UsuarioCreate`. `rol` tampoco se actualiza desde aquí: nace "cliente" y solo
+ * `service_role` lo cambia (AD-9 → A).
+ */
+export type UsuarioUpdate = Partial<Omit<User, Generados | 'rol'>>;
 
 export type ConversacionCreate = Omit<Conversation, Generados>;
 export type ConversacionUpdate = Partial<Omit<Conversation, Generados | 'usuario_id'>>;
@@ -89,7 +99,6 @@ export interface DatabaseClient {
 }
 
 export interface UsuarioRepository {
-  create(usuario: UsuarioCreate): Promise<User>;
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
   update(id: string, data: UsuarioUpdate): Promise<User>;

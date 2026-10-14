@@ -142,7 +142,6 @@ try {
 #### Schemas disponibles
 
 - `userSchema` - Validar User
-- `createUserSchema` - Crear usuario (sin id/timestamps)
 - `messageSchema` - Validar Message
 - `chatRequestSchema` - Validar ChatRequest
 - `chatResponseSchema` - Validar ChatResponse

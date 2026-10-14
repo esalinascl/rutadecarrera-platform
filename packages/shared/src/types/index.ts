@@ -20,8 +20,15 @@
 export type IsoDateString = string;
 
 /**
+ * Rol de un usuario (AD-9 → A). Lo asigna el sistema, nunca el propio usuario:
+ * todos nacen como "cliente" y solo `service_role` puede cambiarlo.
+ */
+export type RolUsuario = 'cliente' | 'consultor' | 'admin';
+
+/**
  * Usuario registrado en la plataforma.
- * Refleja exactamente la tabla `usuarios` (ver db/migrations/001_init_schema.sql).
+ * Refleja exactamente la tabla `usuarios` (migraciones 001_init_schema.sql y
+ * 003_auth_rls.sql, esta última agrega `rol`).
  *
  * @example
  * const user: User = {
@@ -30,7 +37,8 @@ export type IsoDateString = string;
  *   nombre: "Juan Pérez",
  *   contexto_inicial: { situacion: "Desempleado" },
  *   creado_en: "2026-09-24T10:30:00.000Z",
- *   actualizado_en: "2026-09-24T10:30:00.000Z"
+ *   actualizado_en: "2026-09-24T10:30:00.000Z",
+ *   rol: "cliente"
  * }
  */
 export interface User {
@@ -40,6 +48,7 @@ export interface User {
   contexto_inicial: ContextoInicial | null;
   creado_en: IsoDateString;
   actualizado_en: IsoDateString;
+  rol: RolUsuario;
 }
 
 /**

@@ -17,7 +17,6 @@ import type {
   User,
   ValidationError,
 } from '../types';
-import type { UsuarioCreate } from '../db/schema';
 
 /**
  * Esquema Zod atado a un tipo TypeScript.
@@ -57,17 +56,8 @@ export const userSchema = z.object({
   contexto_inicial: contextoSchema.nullable(),
   creado_en: fechaIso,
   actualizado_en: fechaIso,
+  rol: z.enum(['cliente', 'consultor', 'admin'], { message: 'Rol inválido' }),
 }).strict() satisfies Esquema<User>;
-
-/**
- * Schema para crear usuario (sin id ni fechas, que genera la base).
- * `contexto_inicial` es opcional al crear; si no viene, se guarda como null.
- */
-export const createUserSchema = z.object({
-  email: z.string().email('Email inválido'),
-  nombre: z.string().min(2, 'Nombre debe tener al menos 2 caracteres'),
-  contexto_inicial: contextoSchema.nullable().default(null),
-}).strict() satisfies Esquema<UsuarioCreate>;
 
 /**
  * Schema para mensaje (refleja la tabla `mensajes`)

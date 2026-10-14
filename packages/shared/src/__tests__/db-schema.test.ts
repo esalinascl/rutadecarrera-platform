@@ -7,15 +7,19 @@
  * declaran las entidades de `types/index.ts` (vía COLUMNAS_POR_TABLA).
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { COLUMNAS_POR_TABLA, type NombreTabla } from '../db/schema';
 
-const rutaMigracion = fileURLToPath(
-  new URL('../db/migrations/001_init_schema.sql', import.meta.url)
-);
-const sql = readFileSync(rutaMigracion, 'utf8');
+const carpetaMigraciones = fileURLToPath(new URL('../db/migrations/', import.meta.url));
+const sql = readFileSync(`${carpetaMigraciones}001_init_schema.sql`, 'utf8');
+
+/** Todas las migraciones, en orden numérico (001, 002, 003...). */
+const migraciones = readdirSync(carpetaMigraciones)
+  .filter((nombre) => /^\d{3}_.*\.sql$/.test(nombre))
+  .sort()
+  .map((nombre) => readFileSync(`${carpetaMigraciones}${nombre}`, 'utf8'));
 
 /** Extrae los nombres de columna de cada CREATE TABLE del SQL. */
 function columnasDelSql(texto: string): Record<string, string[]> {
@@ -32,7 +36,26 @@ function columnasDelSql(texto: string): Record<string, string[]> {
   return tablas;
 }
 
-const tablasSql = columnasDelSql(sql);
+/**
+ * Columnas finales de cada tabla: las del CREATE TABLE más las que agregan
+ * después las migraciones con `ALTER TABLE ... ADD COLUMN`.
+ */
+function columnasFinales(textos: string[]): Record<string, string[]> {
+  const tablas: Record<string, string[]> = {};
+  for (const texto of textos) {
+    for (const [tabla, columnas] of Object.entries(columnasDelSql(texto))) {
+      tablas[tabla] = columnas;
+    }
+    const patron = /ALTER TABLE\s+(\w+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)/g;
+    for (const [, tabla, columna] of texto.matchAll(patron)) {
+      if (!tablas[tabla]) throw new Error(`ADD COLUMN sobre la tabla desconocida "${tabla}"`);
+      if (!tablas[tabla].includes(columna)) tablas[tabla].push(columna);
+    }
+  }
+  return tablas;
+}
+
+const tablasSql = columnasFinales(migraciones);
 const tablasTs = Object.keys(COLUMNAS_POR_TABLA) as NombreTabla[];
 
 describe('Esquema SQL ↔ tipos TypeScript', () => {
