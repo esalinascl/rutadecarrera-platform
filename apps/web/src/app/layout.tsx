@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SiteNav } from '../components/site-nav';
 
 export const metadata: Metadata = {
   title: 'Asistente de Empleabilidad — Ruta de Carrera',
@@ -12,7 +13,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        <SiteNav />
+        {children}
+      </body>
     </html>
   );
 }
