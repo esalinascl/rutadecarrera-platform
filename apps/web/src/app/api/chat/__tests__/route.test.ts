@@ -14,11 +14,18 @@ vi.mock('@rcp/shared', async (importOriginal) => {
   };
 });
 
-// Import DESPUÉS del mock: POST usa el `callGemini` mockeado.
+// La sesión se simula: TASK 9 hace que el usuario salga de la sesión, no del body.
+vi.mock('../../../../lib/auth/usuario-sesion', () => ({
+  obtenerUsuarioId: vi.fn(),
+}));
+
+// Import DESPUÉS de los mocks: POST usa el `callGemini` y la sesión simulados.
 import { POST } from '../route';
 import { callGemini, GeminiError } from '@rcp/shared';
+import { obtenerUsuarioId } from '../../../../lib/auth/usuario-sesion';
 
 const callGeminiMock = vi.mocked(callGemini);
+const obtenerUsuarioIdMock = vi.mocked(obtenerUsuarioId);
 
 function crearRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost:3000/api/chat', {
@@ -46,11 +53,13 @@ describe('POST /api/chat', () => {
     vi.stubEnv('GEMINI_MODEL', 'gemini-3.8-flash');
     callGeminiMock.mockReset();
     callGeminiMock.mockResolvedValue(RESPUESTA_GEMINI_OK);
+    // Un usuario nuevo por test, para no compartir el contador de rate limit.
+    obtenerUsuarioIdMock.mockReset();
+    obtenerUsuarioIdMock.mockResolvedValue(uuidDePrueba());
   });
 
   it('responde 200 con una estructura ChatResponse válida, con datos reales de Gemini', async () => {
     const request = crearRequest({
-      usuario_id: uuidDePrueba(),
       mensaje: 'Hola, necesito ayuda con mi transición profesional',
     });
 
@@ -75,7 +84,6 @@ describe('POST /api/chat', () => {
 
     await POST(
       crearRequest({
-        usuario_id: uuidDePrueba(),
         mensaje: 'Continuemos la conversación',
         historial,
       }),
@@ -103,7 +111,7 @@ describe('POST /api/chat', () => {
   });
 
   it('funde el prompt de sistema con el mensaje nuevo cuando no hay historial (mismo motivo)', async () => {
-    await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: 'Hola, primera vez' }));
+    await POST(crearRequest({ mensaje: 'Hola, primera vez' }));
 
     const [mensajesEnviados] = callGeminiMock.mock.calls[0];
 
@@ -115,7 +123,7 @@ describe('POST /api/chat', () => {
   });
 
   it('pasa el timeout de 5s y el modelo de GEMINI_MODEL a callGemini', async () => {
-    await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: 'Hola' }));
+    await POST(crearRequest({ mensaje: 'Hola' }));
 
     const [, , opciones] = callGeminiMock.mock.calls[0];
     expect(opciones).toMatchObject({ timeout: 5000, model: 'gemini-3.8-flash' });
@@ -124,7 +132,6 @@ describe('POST /api/chat', () => {
   it('usa el conversacion_id recibido en vez de generar uno nuevo', async () => {
     const conversacionId = uuidDePrueba();
     const request = crearRequest({
-      usuario_id: uuidDePrueba(),
       conversacion_id: conversacionId,
       mensaje: 'Continuemos la conversación anterior',
     });
@@ -136,18 +143,48 @@ describe('POST /api/chat', () => {
   });
 
   it('responde 400 cuando el mensaje está vacío', async () => {
-    const request = crearRequest({ usuario_id: uuidDePrueba(), mensaje: '' });
+    const request = crearRequest({ mensaje: '' });
     const response = await POST(request);
 
     expect(response.status).toBe(400);
     expect(callGeminiMock).not.toHaveBeenCalled();
   });
 
-  it('responde 400 cuando usuario_id no es un UUID válido', async () => {
-    const request = crearRequest({ usuario_id: 'no-es-un-uuid', mensaje: 'Hola' });
-    const response = await POST(request);
+  it('TASK 9: sin sesión responde 401 y no llama a Gemini', async () => {
+    obtenerUsuarioIdMock.mockResolvedValue(null);
 
-    expect(response.status).toBe(400);
+    const response = await POST(crearRequest({ mensaje: 'Hola' }));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'No autenticado' });
+    expect(callGeminiMock).not.toHaveBeenCalled();
+  });
+
+  it('TASK 9: ignora un usuario_id enviado en el body y usa el de la sesión', async () => {
+    const idSesion = uuidDePrueba();
+    const idFalso = uuidDePrueba();
+    obtenerUsuarioIdMock.mockResolvedValue(idSesion);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const response = await POST(crearRequest({ usuario_id: idFalso, mensaje: 'Hola' }));
+
+    expect(response.status).toBe(200);
+    const registros = log.mock.calls.map((llamada) => String(llamada[0]));
+    expect(registros.some((r) => r.includes(idSesion))).toBe(true);
+    expect(registros.some((r) => r.includes(idFalso))).toBe(false);
+    log.mockRestore();
+  });
+
+  it('TASK 9: el límite de solicitudes se cuenta por el usuario de la sesión, no por el body', async () => {
+    obtenerUsuarioIdMock.mockResolvedValue(uuidDePrueba());
+
+    for (let i = 0; i < 60; i++) {
+      // Un usuario_id distinto en cada petición NO debe evadir el límite.
+      await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: `Mensaje ${i}` }));
+    }
+    const response = await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: 'Debe fallar' }));
+
+    expect(response.status).toBe(429);
   });
 
   it('responde 400 cuando el cuerpo no es JSON válido', async () => {
@@ -162,13 +199,13 @@ describe('POST /api/chat', () => {
   });
 
   it('responde 429 cuando se excede el límite de 60 solicitudes por minuto', async () => {
-    const usuarioId = uuidDePrueba();
+    obtenerUsuarioIdMock.mockResolvedValue(uuidDePrueba());
 
     for (let i = 0; i < 60; i++) {
-      await POST(crearRequest({ usuario_id: usuarioId, mensaje: `Mensaje ${i}` }));
+      await POST(crearRequest({ mensaje: `Mensaje ${i}` }));
     }
 
-    const response = await POST(crearRequest({ usuario_id: usuarioId, mensaje: 'Este debería fallar' }));
+    const response = await POST(crearRequest({ mensaje: 'Este debería fallar' }));
     const data = await response.json();
 
     expect(response.status).toBe(429);
@@ -180,7 +217,7 @@ describe('POST /api/chat', () => {
       new GeminiError('Gemini API timeout (> 5000ms)', 'TIMEOUT', 504),
     );
 
-    const response = await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: 'Hola' }));
+    const response = await POST(crearRequest({ mensaje: 'Hola' }));
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -192,7 +229,7 @@ describe('POST /api/chat', () => {
   it('responde 500 sin llamar a Gemini cuando falta GEMINI_API_KEY', async () => {
     vi.stubEnv('GEMINI_API_KEY', '');
 
-    const response = await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: 'Hola' }));
+    const response = await POST(crearRequest({ mensaje: 'Hola' }));
 
     expect(response.status).toBe(500);
     expect(callGeminiMock).not.toHaveBeenCalled();
@@ -201,7 +238,7 @@ describe('POST /api/chat', () => {
   it('responde 500 sin llamar a Gemini cuando falta GEMINI_MODEL (evita caer en el default descontinuado de @rcp/shared)', async () => {
     vi.stubEnv('GEMINI_MODEL', '');
 
-    const response = await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: 'Hola' }));
+    const response = await POST(crearRequest({ mensaje: 'Hola' }));
 
     expect(response.status).toBe(500);
     expect(callGeminiMock).not.toHaveBeenCalled();
@@ -215,7 +252,7 @@ describe('POST /api/chat', () => {
       finishReason: 'STOP',
     });
 
-    const response = await POST(crearRequest({ usuario_id: uuidDePrueba(), mensaje: 'Hola' }));
+    const response = await POST(crearRequest({ mensaje: 'Hola' }));
     const data = await response.json();
 
     expect(data.respuesta).not.toMatch(/sk-abcd12345678/);

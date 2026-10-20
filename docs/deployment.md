@@ -55,8 +55,12 @@ Un único proyecto Vercel (`rutadecarrera`) sirve la app `apps/web`:
 | `GEMINI_API_KEY` | clave de desarrollo | clave de producción |
 | `GEMINI_MODEL` | (pendiente de decidir) | (pendiente de decidir) |
 | `NEXT_PUBLIC_APP_URL` | (URL del preview) | dominio real |
+| `NEXT_PUBLIC_SUPABASE_URL` | staging (igual a `SUPABASE_URL`) | producción |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | clave **publicable** de staging | clave **publicable** de producción |
 
 > **Regla D3:** un preview nunca usa claves ni base de datos de producción.
+>
+> **Magic Link (TASK 9):** en Supabase → Authentication → URL Configuration, cada proyecto debe tener como *Site URL* y *Redirect URLs* la URL de su entorno + `/auth/callback` (staging ≠ producción). La clave `NEXT_PUBLIC_SUPABASE_ANON_KEY` es la **publicable** (`sb_publishable_…` o `anon`): jamás la `service_role` (el código lo rechaza).
 
 4. Dominio: `www.rutadecarrera.com` y el apex (**ya apuntan a este proyecto desde el 2026-10-20**; el apex redirige 308 a `www`). `app.*` y `disc.*` pasan a redirecciones 301 hacia `www` por etapas (ver ADR 002).
 
