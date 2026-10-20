@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rueda de la Vida</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f8f8f6; color: #222; min-height: 100vh; }
+    header { background: #fff; border-bottom: 1px solid #e5e5e5; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .header-center { text-align: left; flex: 1; }
+    header h1 { font-size: 22px; font-weight: 600; color: #222; }
+    header p { font-size: 13px; color: #888; margin-top: 4px; max-width: 520px; line-height: 1.5; }
+    .logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; text-decoration: none; }
+    .logo-circle { width: 36px; height: 36px; background: #2d2d2d; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .logo-esb { color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; font-family: Georgia, serif; }
+    .logo-name { font-size: 13px; font-weight: 300; letter-spacing: 2px; color: #2d2d2d; text-transform: uppercase; white-space: nowrap; }
+    .header-placeholder { width: 160px; flex-shrink: 0; }
+    @media (max-width: 580px) { .header-placeholder { display: none; } .logo-name { display: none; } }
+    .layout { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px; max-width: 1000px; margin: 0 auto; justify-content: center; align-items: stretch; }
+    .wheel-col { flex: 0 0 auto; display: flex; align-items: center; }
+    .controls-col { flex: 1 1 280px; min-width: 260px; display: flex; flex-direction: column; }
+    canvas { display: block; border-radius: 12px; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+    .summary { display: flex; gap: 12px; margin-bottom: 16px; }
+    .stat { flex: 1; background: #fff; border-radius: 10px; padding: 12px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .stat-val { font-size: 24px; font-weight: 600; color: #222; }
+    .stat-lbl { font-size: 11px; color: #888; margin-top: 3px; }
+    .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .zone-card { background: #fff; border-radius: 10px; padding: 10px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .zone-label { font-size: 13px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 7px; }
+    .zone-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+    .zone-row { display: flex; align-items: center; gap: 8px; }
+    .zone-row input[type=range] { flex: 1; accent-color: #378ADD; cursor: pointer; }
+    .zone-score { font-size: 14px; font-weight: 600; min-width: 22px; text-align: right; }
+    .btn-row { display: flex; gap: 10px; }
+    .btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 11px; border-radius: 8px; border: 1px solid #ddd; background: #fff; font-size: 14px; font-weight: 500; color: #333; cursor: pointer; transition: background 0.12s; }
+    .btn:hover { background: #f5f5f5; }
+    .btn-primary { background: #378ADD; border-color: #378ADD; color: #fff; }
+    .btn-primary:hover { background: #2a6db5; }
+    .hint { font-size: 11px; color: #aaa; text-align: center; margin-top: 8px; }
+    @media (max-width: 620px) {
+      .layout { padding: 16px; gap: 16px; }
+      canvas { width: 300px !important; height: 300px !important; }
+      .summary { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-center">
+    <h1>Rueda de la Vida</h1>
+    <p>Puntúa de 1 a 10 cada espacio de tu vida, donde 10 es como te gustaría estar y 1 lo peor que podrías estar en esa dimensión.</p>
+  </div>
+  <div class="logo">
+    <div class="logo-circle"><span class="logo-esb">ESB</span></div>
+    <span class="logo-name">Eduardo Salinas Belletti</span>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="wheel-col">
+    <canvas id="wheel" width="360" height="360"></canvas>
+  </div>
+
+  <div class="controls-col">
+    <div class="summary">
+      <div class="stat"><div class="stat-val" id="avg">—</div><div class="stat-lbl">Promedio general</div></div>
+      <div class="stat"><div class="stat-val" id="hi-lbl" style="font-size:15px; padding-top:4px;">—</div><div class="stat-lbl">Zona más alta</div></div>
+      <div class="stat"><div class="stat-val" id="lo-lbl" style="font-size:15px; padding-top:4px;">—</div><div class="stat-lbl">Zona más baja</div></div>
+    </div>
+
+    <div class="controls" id="controls"></div>
+
+    <div class="btn-row">
+      <button class="btn" onclick="downloadPNG()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Descargar imagen
+      </button>
+      <button class="btn btn-primary" onclick="downloadPDF()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        Imprimir o descargar PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const zones = [
+  { name: 'Profesional',        color: '#7F77DD', score: 5 },
+  { name: 'Red de Apoyo',       color: '#D4537E', score: 5 },
+  { name: 'Emocional – Pasión', color: '#E24B4A', score: 5 },
+  { name: 'Salud y Vitalidad',  color: '#1D9E75', score: 5 },
+  { name: 'Relaciones',         color: '#378ADD', score: 5 },
+  { name: 'Finanzas',           color: '#BA7517', score: 5 },
+  { name: 'Ambiente Físico',    color: '#639922', score: 5 },
+  { name: 'Crecimiento',        color: '#D85A30', score: 5 },
+];
+const N = zones.length;
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+function drawWheel() {
+  const W = canvas.width, H = canvas.height;
+  const CX = W / 2, CY = H / 2;
+  const margin = W * 0.22;
+  const R = CX - margin;
+  const labelR = R + margin * 0.55;
+  const fontSize = Math.max(9, Math.round(W * 0.031));
+
+  ctx.clearRect(0, 0, W, H);
+  const slice = (2 * Math.PI) / N;
+  const off = -Math.PI / 2;
+
+  for (let ring = 10; ring >= 1; ring--) {
+    for (let i = 0; i < N; i++) {
+      const s = off + i * slice, e = s + slice;
+      const r = (R / 10) * ring;
+      ctx.beginPath(); ctx.moveTo(CX, CY); ctx.arc(CX, CY, r, s, e); ctx.closePath();
+      ctx.fillStyle = ring <= zones[i].score ? zones[i].color + 'CC' : 'rgba(200,200,200,0.18)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.5; ctx.stroke();
+    }
+  }
+  for (let ring = 1; ring <= 10; ring++) {
+    const r = (R / 10) * ring;
+    ctx.beginPath(); ctx.arc(CX, CY, r, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(130,130,130,0.2)'; ctx.lineWidth = 0.5; ctx.stroke();
+    if (ring % 2 === 0) {
+      ctx.fillStyle = 'rgba(100,100,100,0.45)';
+      ctx.font = (fontSize - 2) + 'px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(ring, CX + 3, CY - r + fontSize);
+    }
+  }
+  for (let i = 0; i < N; i++) {
+    const angle = off + i * slice;
+    ctx.beginPath(); ctx.moveTo(CX, CY);
+    ctx.lineTo(CX + R * Math.cos(angle), CY + R * Math.sin(angle));
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(CX, CY, 3.5, 0, 2 * Math.PI);
+  ctx.fillStyle = 'rgba(100,100,100,0.5)'; ctx.fill();
+
+  ctx.font = fontSize + 'px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < N; i++) {
+    const mid = off + (i + 0.5) * slice;
+    const lx = CX + labelR * Math.cos(mid), ly = CY + labelR * Math.sin(mid);
+    ctx.fillStyle = '#444';
+    const words = zones[i].name.split(' ');
+    const lineH = fontSize + 2;
+    if (words.length === 1) {
+      ctx.fillText(words[0], lx, ly);
+    } else if (words.length === 2) {
+      ctx.fillText(words[0], lx, ly - lineH / 2);
+      ctx.fillText(words[1], lx, ly + lineH / 2);
+    } else {
+      ctx.fillText(words.slice(0, 2).join(' '), lx, ly - lineH / 2);
+      ctx.fillText(words.slice(2).join(' '), lx, ly + lineH / 2);
+    }
+  }
+}
+
+function buildControls() {
+  const cont = document.getElementById('controls');
+  cont.innerHTML = '';
+  zones.forEach((z, i) => {
+    const card = document.createElement('div');
+    card.className = 'zone-card';
+    card.innerHTML = `<div class="zone-label"><span class="zone-dot" style="background:${z.color}"></span>${z.name}</div>
+      <div class="zone-row">
+        <input type="range" min="1" max="10" step="1" value="${z.score}">
+        <span class="zone-score" id="sc-${i}" style="color:${z.color}">${z.score}</span>
+      </div>`;
+    cont.appendChild(card);
+    card.querySelector('input').addEventListener('input', e => {
+      zones[i].score = parseInt(e.target.value);
+      document.getElementById('sc-' + i).textContent = zones[i].score;
+      drawWheel(); updateStats();
+    });
+  });
+}
+
+function updateStats() {
+  const sc = zones.map(z => z.score);
+  const avg = (sc.reduce((a,b)=>a+b,0)/N).toFixed(1);
+  const hi = sc.indexOf(Math.max(...sc)), lo = sc.indexOf(Math.min(...sc));
+  document.getElementById('avg').textContent = avg;
+  document.getElementById('hi-lbl').textContent = zones[hi].name.split(' ')[0];
+  document.getElementById('lo-lbl').textContent = zones[lo].name.split(' ')[0];
+}
+
+function getFileName(ext) {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}${mm}${dd} Rueda de la vida.${ext}`;
+}
+
+function downloadPNG() {
+  const link = document.createElement('a');
+  link.download = getFileName('png');
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function downloadPDF() {
+  const img = canvas.toDataURL('image/png');
+  const sc = zones.map(z => z.score);
+  const avg = (sc.reduce((a,b)=>a+b,0)/N).toFixed(1);
+  const today = new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'});
+  const rows = zones.map(z => `<tr>
+    <td style="padding:7px 8px;display:flex;align-items:center;gap:8px;">
+      <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${z.color};flex-shrink:0;"></span>${z.name}
+    </td>
+    <td style="padding:7px 8px;font-weight:700;color:${z.color};">${z.score}/10</td>
+    <td style="padding:7px 8px;width:160px;">
+      <div style="background:#eee;border-radius:4px;height:8px;">
+        <div style="background:${z.color};border-radius:4px;height:8px;width:${z.score*10}%;"></div>
+      </div>
+    </td></tr>`).join('');
+  const fileName = getFileName('pdf').replace('.pdf','');
+  const style = [
+    '@media print{.no-print{display:none}@page{margin:1.5cm}}',
+    'body{font-family:Arial,sans-serif;padding:40px;color:#222}',
+    '.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}',
+    'h1{font-size:22px;margin:0}',
+    '.logo{display:flex;align-items:center;gap:9px}',
+    '.lc{width:36px;height:36px;background:#2d2d2d;border-radius:50%;display:flex;align-items:center;justify-content:center}',
+    '.le{color:#fff;font-size:9px;font-weight:700;letter-spacing:.5px;font-family:Georgia,serif}',
+    '.ln{font-size:11px;font-weight:300;letter-spacing:2px;color:#2d2d2d;text-transform:uppercase;line-height:1.35}',
+    'p.date{color:#999;font-size:13px;margin-bottom:24px}',
+    'img{display:block;margin:0 auto 20px;max-width:280px}',
+    '.avg{text-align:center;font-size:17px;font-weight:700;margin-bottom:20px}',
+    'table{width:100%;border-collapse:collapse}',
+    'td{border-bottom:1px solid #f0f0f0;font-size:13px}',
+    '.btn{display:block;margin:28px auto 0;padding:10px 36px;background:#2d2d2d;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer}'
+  ].join('');
+
+  const parts = [
+    '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">',
+    '<title>' + fileName + '</title>',
+    '<style>' + style + '</style>',
+    '</head><body onload="setTimeout(function(){window.print()},500)">',
+    '<div class="top">',
+    '<h1>Rueda de la Vida</h1>',
+    '<div class="logo"><div class="lc"><span class="le">ESB</span></div>',
+    '<span class="ln">Eduardo Salinas Belletti</span></div></div>',
+    '<p class="date">' + today + '</p>',
+    '<img src="' + img + '">',
+    '<div class="avg">Promedio general: ' + avg + ' / 10</div>',
+    '<table><tbody>' + rows + '</tbody></table>',
+    '<button class="btn no-print" onclick="window.print()">Imprimir / Guardar como PDF</button>',
+    '</body></html>'
+  ];
+  const html = parts.join('');
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 15000);
+}
+
+function syncWheelHeight() {
+  const col = document.querySelector('.controls-col');
+  const h = col.offsetHeight;
+  if (h < 200) return;
+  const size = Math.min(h, 600);
+  canvas.width = size;
+  canvas.height = size;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  const scale = size / 360;
+  canvas._scale = scale;
+  drawWheel();
+}
+
+buildControls(); drawWheel(); updateStats();
+window.addEventListener('load', syncWheelHeight);
+window.addEventListener('resize', syncWheelHeight);
+</script>
+</body>
+</html>
