@@ -60,7 +60,7 @@
 
 <div class="layout">
   <div class="wheel-col">
-    <canvas id="wheel" width="360" height="360"></canvas>
+    <canvas id="wheel" width="360" height="360" role="img" aria-label="Rueda de la Vida"></canvas>
   </div>
 
   <div class="controls-col">
@@ -73,28 +73,37 @@
     <div class="controls" id="controls"></div>
 
     <div class="btn-row">
-      <button class="btn" onclick="downloadPNG()">
+      <button class="btn" id="btn-png" type="button">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         Descargar imagen
       </button>
-      <button class="btn btn-primary" onclick="downloadPDF()">
+      <button class="btn btn-primary" id="btn-pdf" type="button">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
         Imprimir o descargar PDF
       </button>
     </div>
+    <p class="hint" id="aviso" role="status" aria-live="polite"></p>
   </div>
 </div>
 
-<script>
+<script type="module">
+import {
+  PUNTAJE_INICIAL,
+  calcularResumen,
+  etiquetaCorta,
+  nombreArchivo,
+  normalizarPuntaje,
+} from '/ruedadelavida/calculos.js';
+
 const zones = [
-  { name: 'Profesional',        color: '#7F77DD', score: 5 },
-  { name: 'Red de Apoyo',       color: '#D4537E', score: 5 },
-  { name: 'Emocional – Pasión', color: '#E24B4A', score: 5 },
-  { name: 'Salud y Vitalidad',  color: '#1D9E75', score: 5 },
-  { name: 'Relaciones',         color: '#378ADD', score: 5 },
-  { name: 'Finanzas',           color: '#BA7517', score: 5 },
-  { name: 'Ambiente Físico',    color: '#639922', score: 5 },
-  { name: 'Crecimiento',        color: '#D85A30', score: 5 },
+  { name: 'Profesional',        color: '#7F77DD', score: PUNTAJE_INICIAL },
+  { name: 'Red de Apoyo',       color: '#D4537E', score: PUNTAJE_INICIAL },
+  { name: 'Emocional – Pasión', color: '#E24B4A', score: PUNTAJE_INICIAL },
+  { name: 'Salud y Vitalidad',  color: '#1D9E75', score: PUNTAJE_INICIAL },
+  { name: 'Relaciones',         color: '#378ADD', score: PUNTAJE_INICIAL },
+  { name: 'Finanzas',           color: '#BA7517', score: PUNTAJE_INICIAL },
+  { name: 'Ambiente Físico',    color: '#639922', score: PUNTAJE_INICIAL },
+  { name: 'Crecimiento',        color: '#D85A30', score: PUNTAJE_INICIAL },
 ];
 const N = zones.length;
 const canvas = document.getElementById('wheel');
@@ -167,14 +176,15 @@ function buildControls() {
   zones.forEach((z, i) => {
     const card = document.createElement('div');
     card.className = 'zone-card';
-    card.innerHTML = `<div class="zone-label"><span class="zone-dot" style="background:${z.color}"></span>${z.name}</div>
+    card.innerHTML = `<label class="zone-label" for="rng-${i}"><span class="zone-dot" style="background:${z.color}" aria-hidden="true"></span>${z.name}</label>
       <div class="zone-row">
-        <input type="range" min="1" max="10" step="1" value="${z.score}">
+        <input type="range" id="rng-${i}" min="1" max="10" step="1" value="${z.score}" aria-valuetext="${z.score} de 10">
         <span class="zone-score" id="sc-${i}" style="color:${z.color}">${z.score}</span>
       </div>`;
     cont.appendChild(card);
     card.querySelector('input').addEventListener('input', e => {
-      zones[i].score = parseInt(e.target.value);
+      zones[i].score = normalizarPuntaje(e.target.value);
+      e.target.setAttribute('aria-valuetext', zones[i].score + ' de 10');
       document.getElementById('sc-' + i).textContent = zones[i].score;
       drawWheel(); updateStats();
     });
@@ -182,20 +192,20 @@ function buildControls() {
 }
 
 function updateStats() {
-  const sc = zones.map(z => z.score);
-  const avg = (sc.reduce((a,b)=>a+b,0)/N).toFixed(1);
-  const hi = sc.indexOf(Math.max(...sc)), lo = sc.indexOf(Math.min(...sc));
-  document.getElementById('avg').textContent = avg;
-  document.getElementById('hi-lbl').textContent = zones[hi].name.split(' ')[0];
-  document.getElementById('lo-lbl').textContent = zones[lo].name.split(' ')[0];
+  const r = calcularResumen(zones.map(z => z.score), zones.map(z => z.name));
+  document.getElementById('avg').textContent = r.promedio;
+  document.getElementById('hi-lbl').textContent = etiquetaCorta(r.nombreMasAlta);
+  document.getElementById('lo-lbl').textContent = etiquetaCorta(r.nombreMasBaja);
+  canvas.setAttribute('aria-label', 'Rueda de la Vida. Promedio ' + r.promedio + ' de 10. ' +
+    zones.map(z => z.name + ' ' + z.score).join(', '));
 }
 
 function getFileName(ext) {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  return `${yyyy}${mm}${dd} Rueda de la vida.${ext}`;
+  return nombreArchivo(new Date(), ext);
+}
+
+function mostrarAviso(texto) {
+  document.getElementById('aviso').textContent = texto;
 }
 
 function downloadPNG() {
@@ -258,6 +268,11 @@ function downloadPDF() {
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const w = window.open(url, '_blank');
+  if (!w) {
+    mostrarAviso('Tu navegador bloqueó la ventana del PDF. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.');
+  } else {
+    mostrarAviso('');
+  }
   setTimeout(() => URL.revokeObjectURL(url), 15000);
 }
 
@@ -274,6 +289,9 @@ function syncWheelHeight() {
   canvas._scale = scale;
   drawWheel();
 }
+
+document.getElementById('btn-png').addEventListener('click', downloadPNG);
+document.getElementById('btn-pdf').addEventListener('click', downloadPDF);
 
 buildControls(); drawWheel(); updateStats();
 window.addEventListener('load', syncWheelHeight);
