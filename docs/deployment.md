@@ -58,7 +58,7 @@ Un único proyecto Vercel (`rutadecarrera`) sirve la app `apps/web`:
 
 > **Regla D3:** un preview nunca usa claves ni base de datos de producción.
 
-4. Dominio: `www.rutadecarrera.com` y el apex. `app.*` y `disc.*` pasan a redirecciones 301 hacia `www` por etapas (ver ADR 002).
+4. Dominio: `www.rutadecarrera.com` y el apex (**ya apuntan a este proyecto desde el 2026-10-20**; el apex redirige 308 a `www`). `app.*` y `disc.*` pasan a redirecciones 301 hacia `www` por etapas (ver ADR 002).
 
 ## Revertir un despliegue malo
 

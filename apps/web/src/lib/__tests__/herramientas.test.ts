@@ -42,3 +42,17 @@ describe('página estática de la Rueda de la Vida', () => {
     expect(html).not.toMatch(/fetch\(|XMLHttpRequest/);
   });
 });
+
+describe('módulo de cálculo de la Rueda de la Vida', () => {
+  const html = readFileSync(resolve(__dirname, '../../../public/ruedadelavida/index.html'), 'utf8');
+
+  it('la página lo carga con ruta absoluta (se sirve sin barra final en /ruedadelavida)', () => {
+    expect(html).toContain("from '/ruedadelavida/calculos.js'");
+    expect(html).not.toContain("from './calculos.js'");
+  });
+
+  it('los controles tienen etiqueta asociada (RNF-03)', () => {
+    expect(html).toContain('<label class="zone-label" for="rng-${i}"');
+    expect(html).toContain('id="rng-${i}"');
+  });
+});

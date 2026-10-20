@@ -40,6 +40,8 @@ Vercel, registro DNS y configuración de variables.
     merge de M1 (si no, el build falla).
   - **M3:** `www` y el apex pasan del proyecto `rutadecarrera-1` a `rutadecarrera`
     cuando exista la landing.
+    **Hecho el 2026-10-20** (operación «move» de la API de Vercel; el DNS no cambió).
+    Revertir: mover `www.rutadecarrera.com` de vuelta a `rutadecarrera-1`.
   - **M4:** `app.rutadecarrera.com` → redirección 301 a `www`.
   - **M5:** `disc.rutadecarrera.com` → redirección 301 **solo** cuando el Test
     DISC exista dentro de `apps/web`. Hoy es un sitio independiente en uso.
