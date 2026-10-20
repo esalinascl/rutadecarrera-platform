@@ -42,4 +42,28 @@ describe('leerConfigPublica', () => {
       }),
     ).toThrow(/secreta/);
   });
+
+  it('rechaza la clave service_role legada (un JWT con role=service_role)', () => {
+    const payload = Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url');
+    const jwt = `eyJhbGciOiJIUzI1NiJ9.${payload}.firma`;
+    expect(() =>
+      leerConfigPublica({
+        NEXT_PUBLIC_SUPABASE_URL: 'https://x.supabase.co',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: jwt,
+        NEXT_PUBLIC_APP_URL: 'https://app.ejemplo.cl',
+      }),
+    ).toThrow(/secreta/);
+  });
+
+  it('acepta la clave anon legada (JWT con role=anon)', () => {
+    const payload = Buffer.from(JSON.stringify({ role: 'anon' })).toString('base64url');
+    const jwt = `eyJhbGciOiJIUzI1NiJ9.${payload}.firma`;
+    expect(
+      leerConfigPublica({
+        NEXT_PUBLIC_SUPABASE_URL: 'https://x.supabase.co',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: jwt,
+        NEXT_PUBLIC_APP_URL: 'https://app.ejemplo.cl',
+      }).anonKey,
+    ).toBe(jwt);
+  });
 });

@@ -7,11 +7,12 @@
  * - Respuesta NEUTRA: el mensaje es el mismo exista o no el email, y también
  *   si el envío falla (no se puede averiguar qué correos están registrados).
  * - `siguiente` pasa por `rutaSiguienteSegura` (sin redirecciones abiertas).
- * - Límite por email + IP.
+ * - Dos límites independientes: por correo (no se bombardea a una víctima cambiando
+ *   de IP) y por IP (no se recorren correos ajenos desde una sola IP).
  */
 
 import { rutaSiguienteSegura } from './acceso';
-import { claveLimite, type Limitador } from './limitador';
+import { claveEmail, claveIp, type Limitador } from './limitador';
 
 export const MENSAJE_NEUTRO =
   'Si el correo es válido, te enviamos un enlace para ingresar. Revisa tu bandeja de entrada.';
@@ -32,7 +33,10 @@ export interface PedidoMagicLink {
 export interface DependenciasLogin {
   /** Envía el correo con el enlace. Devuelve `error` si Supabase lo rechaza. */
   enviarOtp: (email: string, urlRedireccion: string) => Promise<{ error: unknown }>;
-  limitador: Limitador;
+  /** Envíos por correo (desde cualquier IP). */
+  limitadorCorreo: Limitador;
+  /** Envíos por IP (a cualquier correo). */
+  limitadorIp: Limitador;
   /** URL absoluta de `/auth/callback` (sin query), construida desde NEXT_PUBLIC_APP_URL. */
   urlCallback: string;
 }
@@ -52,7 +56,10 @@ export async function solicitarMagicLink(
     return { estado: 400, mensaje: MENSAJE_EMAIL_INVALIDO };
   }
 
-  if (!deps.limitador.permitir(claveLimite(email, pedido.ip))) {
+  if (
+    !deps.limitadorIp.permitir(claveIp(pedido.ip)) ||
+    !deps.limitadorCorreo.permitir(claveEmail(email))
+  ) {
     return { estado: 429, mensaje: MENSAJE_LIMITE };
   }
 

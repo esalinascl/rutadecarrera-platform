@@ -10,7 +10,8 @@ import { crearLimitador } from '../limitador';
 function crearDeps(sobrescribir: Partial<Parameters<typeof solicitarMagicLink>[1]> = {}) {
   return {
     enviarOtp: vi.fn().mockResolvedValue({ error: null }),
-    limitador: crearLimitador({ max: 3, ventanaMs: 60_000, reloj: () => 0 }),
+    limitadorCorreo: crearLimitador({ max: 3, ventanaMs: 60_000, reloj: () => 0 }),
+    limitadorIp: crearLimitador({ max: 100, ventanaMs: 60_000, reloj: () => 0 }),
     urlCallback: 'https://app.ejemplo.cl/auth/callback',
     ...sobrescribir,
   };
@@ -48,6 +49,27 @@ describe('solicitarMagicLink', () => {
     expect(resultado).toEqual({ estado: 200, mensaje: MENSAJE_NEUTRO });
     expect(JSON.stringify(resultado)).not.toContain('secreto-interno');
     error.mockRestore();
+  });
+
+  it('responde 429 al superar el límite por IP aunque cada correo sea distinto', async () => {
+    const deps = crearDeps({ limitadorIp: crearLimitador({ max: 2, ventanaMs: 60_000, reloj: () => 0 }) });
+    await solicitarMagicLink({ email: 'a@correo.cl', ip: '7.7.7.7', siguiente: null }, deps);
+    await solicitarMagicLink({ email: 'b@correo.cl', ip: '7.7.7.7', siguiente: null }, deps);
+    const tercero = await solicitarMagicLink({ email: 'c@correo.cl', ip: '7.7.7.7', siguiente: null }, deps);
+
+    expect(tercero.estado).toBe(429);
+    expect(deps.enviarOtp).toHaveBeenCalledTimes(2);
+  });
+
+  it('el límite por correo vale desde cualquier IP (no se bombardea a una víctima cambiando de IP)', async () => {
+    const deps = crearDeps();
+    for (let i = 0; i < 3; i++) {
+      await solicitarMagicLink({ email: 'victima@correo.cl', ip: `10.0.0.${i}`, siguiente: null }, deps);
+    }
+    const cuarto = await solicitarMagicLink({ email: 'victima@correo.cl', ip: '10.0.0.99', siguiente: null }, deps);
+
+    expect(cuarto.estado).toBe(429);
+    expect(deps.enviarOtp).toHaveBeenCalledTimes(3);
   });
 
   it('responde 429 al superar el límite y no envía el correo', async () => {

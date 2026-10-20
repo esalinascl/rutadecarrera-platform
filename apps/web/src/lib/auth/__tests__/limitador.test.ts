@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { crearLimitador, claveLimite } from '../limitador';
+import { crearLimitador, claveEmail, claveIp } from '../limitador';
 
 describe('crearLimitador', () => {
   it('permite hasta el máximo y bloquea el siguiente', () => {
@@ -42,12 +42,32 @@ describe('crearLimitador', () => {
   });
 });
 
-describe('claveLimite', () => {
-  it('normaliza el email (mayúsculas y espacios) y lo une con la IP', () => {
-    expect(claveLimite('  Ana@Correo.CL ', '1.2.3.4')).toBe('ana@correo.cl|1.2.3.4');
+describe('crearLimitador — tope duro de memoria', () => {
+  it('con todas las claves vivas y el mapa lleno, rechaza las claves nuevas (no crece sin límite)', () => {
+    const limitador = crearLimitador({ max: 1, ventanaMs: 60_000, reloj: () => 0, maxEntradas: 3 });
+    expect(limitador.permitir('a')).toBe(true);
+    expect(limitador.permitir('b')).toBe(true);
+    expect(limitador.permitir('c')).toBe(true);
+
+    expect(limitador.permitir('d')).toBe(false);
+    expect(limitador.tamano()).toBe(3);
   });
 
-  it('usa "desconocida" si no hay IP', () => {
-    expect(claveLimite('a@b.cl', null)).toBe('a@b.cl|desconocida');
+  it('una clave ya registrada sigue su propio conteo aunque el mapa esté lleno', () => {
+    const limitador = crearLimitador({ max: 2, ventanaMs: 60_000, reloj: () => 0, maxEntradas: 1 });
+    expect(limitador.permitir('a')).toBe(true);
+    expect(limitador.permitir('a')).toBe(true);
+    expect(limitador.permitir('a')).toBe(false);
+  });
+});
+
+describe('claves de límite', () => {
+  it('claveEmail normaliza mayúsculas y espacios', () => {
+    expect(claveEmail('  Ana@Correo.CL ')).toBe('ana@correo.cl');
+  });
+
+  it('claveIp usa "desconocida" si no hay IP y acota el largo', () => {
+    expect(claveIp(null)).toBe('desconocida');
+    expect(claveIp('x'.repeat(500))).toHaveLength(64);
   });
 });

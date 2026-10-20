@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const RAIZ_WEB = resolve(__dirname, '../..');
 
@@ -42,6 +42,36 @@ describe('service_role fuera del navegador', () => {
       const esCliente = /^\s*['"]use client['"]/m.test(texto);
       return esCliente && /SERVICE_ROLE|service_role|@rcp\/shared\/db/.test(texto);
     });
+    expect(infractores).toEqual([]);
+  });
+
+  it('ningún componente de cliente la alcanza tampoco por imports transitivos', () => {
+    const PROHIBIDO = /SERVICE_ROLE|service_role|@rcp\/shared\/db/;
+    const resolver = (desde: string, especificador: string): string | null => {
+      if (!especificador.startsWith('.')) return null;
+      const base = resolve(dirname(desde), especificador);
+      for (const candidato of [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
+        if (existsSync(candidato)) return candidato;
+      }
+      return null;
+    };
+    const infractores: string[] = [];
+
+    for (const raiz of fuentes.filter((r) => /^\s*['"]use client['"]/m.test(readFileSync(r, 'utf-8')))) {
+      const vistos = new Set<string>();
+      const pendientes = [raiz];
+      while (pendientes.length > 0) {
+        const actual = pendientes.pop()!;
+        if (vistos.has(actual)) continue;
+        vistos.add(actual);
+        const texto = readFileSync(actual, 'utf-8');
+        if (PROHIBIDO.test(texto)) infractores.push(`${raiz} -> ${actual}`);
+        for (const m of texto.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+          const destino = resolver(actual, m[1]);
+          if (destino) pendientes.push(destino);
+        }
+      }
+    }
     expect(infractores).toEqual([]);
   });
 

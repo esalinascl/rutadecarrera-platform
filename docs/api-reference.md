@@ -49,8 +49,8 @@ se descarta antes de validar (compatibilidad con clientes anteriores a TASK 9).
 
 | Código | Causa | Body |
 |---|---|---|
-| 400 | JSON inválido, o no cumple el esquema del body (mensaje vacío, historial demasiado largo, etc.; `usuario_id` ya no forma parte del body) |
-| 401 | Sin sesión válida | `{ "error": "No autenticado" }` | `{ "error": "...", "detalles"?: [...] }` |
+| 400 | JSON inválido, o no cumple el esquema del body (mensaje vacío, historial demasiado largo, etc.; `usuario_id` ya no forma parte del body) | `{ "error": "...", "detalles"?: [...] }` |
+| 401 | Sin sesión válida | `{ "error": "No autenticado" }` |
 | 429 | Más de 60 solicitudes en 60 segundos para el mismo usuario **de la sesión** | `{ "error": "Límite de solicitudes excedido..." }` |
 | 500 | Falta `GEMINI_API_KEY`, Gemini falla (timeout, error de API), o cualquier error inesperado | `{ "error": "Error interno del servidor" }` — **nunca** incluye el detalle real del error (ver issue #9) |
 
@@ -91,10 +91,10 @@ Pide el enlace de ingreso. Body: `{ "email": string, "siguiente"?: string }`
 |---|---|---|
 | 200 | Solicitud aceptada. **El mensaje es el mismo exista o no el correo**, y también si el envío falla (no revela qué correos están registrados) | `{ "mensaje": "Si el correo es válido, te enviamos un enlace..." }` |
 | 400 | JSON inválido o email con formato inválido | `{ "mensaje": "..." }` |
-| 429 | Más de 5 envíos en 10 minutos para el mismo correo desde la misma IP | `{ "mensaje": "Demasiados intentos..." }` |
+| 429 | Más de 5 envíos en 10 minutos al mismo correo (desde cualquier IP) o más de 20 desde la misma IP | `{ "mensaje": "Demasiados intentos..." }` |
 | 500 | Falta configuración de Supabase | `{ "mensaje": "Error interno del servidor." }` |
 
-El enlace apunta a `NEXT_PUBLIC_APP_URL` (nunca al encabezado `Host`).
+El enlace apunta a `NEXT_PUBLIC_APP_URL` (nunca al encabezado `Host`). La IP para el límite sale de `x-vercel-forwarded-for` / `x-real-ip`; de `x-forwarded-for` se usa el último valor (el primero lo puede falsificar el cliente).
 
 ### GET /auth/callback
 

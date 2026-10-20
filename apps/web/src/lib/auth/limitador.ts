@@ -46,6 +46,9 @@ export function crearLimitador({
 
       const entrada = contadores.get(clave);
       if (!entrada || ahora > entrada.venceEn) {
+        // Tope duro: con el mapa lleno de claves vivas no se aceptan claves nuevas
+        // (así la memoria no crece sin límite si alguien inunda con claves distintas).
+        if (!entrada && contadores.size >= maxEntradas) return false;
         contadores.set(clave, { cuenta: 1, venceEn: ahora + ventanaMs });
         return true;
       }
@@ -57,7 +60,14 @@ export function crearLimitador({
   };
 }
 
-/** Clave de límite: email normalizado + IP (así un solo correo no se puede inundar). */
-export function claveLimite(email: string, ip: string | null): string {
-  return `${email.trim().toLowerCase()}|${ip ?? 'desconocida'}`;
+const LARGO_MAXIMO_CLAVE_IP = 64;
+
+/** Clave por correo: normalizada, para que `Ana@X.cl` y `ana@x.cl` cuenten juntos. */
+export function claveEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/** Clave por IP: acotada (el encabezado lo puede inflar el cliente). */
+export function claveIp(ip: string | null): string {
+  return (ip ?? 'desconocida').slice(0, LARGO_MAXIMO_CLAVE_IP);
 }

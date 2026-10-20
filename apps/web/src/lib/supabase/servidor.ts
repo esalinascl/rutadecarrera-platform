@@ -12,12 +12,14 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { leerConfigPublica } from './config';
+import { opcionesCookie } from './cookies';
 
 export async function crearClienteServidor(): Promise<SupabaseClient> {
   const config = leerConfigPublica();
   const almacen = await cookies();
 
   return createServerClient(config.url, config.anonKey, {
+    cookieOptions: opcionesCookie(),
     cookies: {
       getAll: () => almacen.getAll(),
       setAll: (aEscribir) => {

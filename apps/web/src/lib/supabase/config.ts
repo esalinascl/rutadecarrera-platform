@@ -12,6 +12,19 @@ export interface ConfigPublicaSupabase {
   appUrl: string;
 }
 
+/** `true` si la clave es la nueva `sb_secret_…` o un JWT legado con `role: service_role`. */
+function esClaveSecreta(clave: string): boolean {
+  if (clave.startsWith('sb_secret_')) return true;
+  const partes = clave.split('.');
+  if (partes.length !== 3) return false;
+  try {
+    const carga = JSON.parse(Buffer.from(partes[1], 'base64url').toString('utf-8')) as { role?: unknown };
+    return carga.role === 'service_role';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Lee la configuración desde variables de entorno.
  * @throws Error en español si falta alguna variable o si la clave es secreta.
@@ -34,7 +47,7 @@ export function leerConfigPublica(
   }
 
   // Defensa: una clave secreta con prefijo NEXT_PUBLIC_ se publicaría en el navegador.
-  if (anonKey!.startsWith('sb_secret_')) {
+  if (esClaveSecreta(anonKey!)) {
     throw new Error(
       'NEXT_PUBLIC_SUPABASE_ANON_KEY contiene una clave secreta: usa la clave publicable (anon).',
     );

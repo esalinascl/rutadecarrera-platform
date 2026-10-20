@@ -11,6 +11,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { decidirAcceso, type Rol } from './lib/auth/acceso';
 import { leerConfigPublica } from './lib/supabase/config';
+import { opcionesCookie } from './lib/supabase/cookies';
 
 const ROLES_VALIDOS: readonly string[] = ['cliente', 'consultor', 'admin'];
 
@@ -32,14 +33,20 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
 
   const config = leerConfigPublica();
-  // Las cookies que Supabase renueve se copian a la respuesta final.
+  // Lo que Supabase renueve (cookies y encabezados anti-caché) se copia a la respuesta final.
   const cookiesNuevas: { name: string; value: string; options?: Record<string, unknown> }[] = [];
+  let encabezadosNuevos: Record<string, string> = {};
 
   const supabase = createServerClient(config.url, config.anonKey, {
+    cookieOptions: opcionesCookie(),
     cookies: {
       getAll: () => request.cookies.getAll(),
-      setAll: (aEscribir) => {
+      setAll: (aEscribir, encabezados) => {
         cookiesNuevas.push(...aEscribir);
+        encabezadosNuevos = { ...encabezadosNuevos, ...(encabezados ?? {}) };
+        // También en la petición: el handler que sigue (p. ej. /api/chat) debe ver
+        // el token YA renovado, no el vencido (el refresh token rota y no sirve dos veces).
+        for (const { name, value } of aEscribir) request.cookies.set(name, value);
       },
     },
   });
@@ -79,11 +86,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       ? NextResponse.json({ error: mensaje }, { status: decision.estado })
       : new NextResponse(mensaje, { status: decision.estado });
   } else {
-    respuesta = NextResponse.next();
+    respuesta = NextResponse.next({ request });
   }
 
   for (const { name, value, options } of cookiesNuevas) {
     respuesta.cookies.set(name, value, options);
+  }
+  for (const [nombre, valor] of Object.entries(encabezadosNuevos)) {
+    respuesta.headers.set(nombre, valor);
   }
   return respuesta;
 }

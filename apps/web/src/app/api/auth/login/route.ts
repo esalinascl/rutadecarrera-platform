@@ -8,10 +8,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { crearClienteServidor } from '../../../../lib/supabase/servidor';
 import { leerConfigPublica } from '../../../../lib/supabase/config';
 import { crearLimitador } from '../../../../lib/auth/limitador';
+import { obtenerIp } from '../../../../lib/auth/ip';
 import { solicitarMagicLink } from '../../../../lib/auth/login';
 
-/** 5 envíos cada 10 minutos por email + IP. */
-const limitador = crearLimitador({ max: 5, ventanaMs: 10 * 60_000 });
+/** 5 envíos cada 10 minutos por correo (desde cualquier IP). */
+const limitadorCorreo = crearLimitador({ max: 5, ventanaMs: 10 * 60_000 });
+/** 20 envíos cada 10 minutos por IP (a cualquier correo). */
+const limitadorIp = crearLimitador({ max: 20, ventanaMs: 10 * 60_000 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let cuerpo: { email?: unknown; siguiente?: unknown };
@@ -23,7 +26,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const email = typeof cuerpo.email === 'string' ? cuerpo.email : '';
   const siguiente = typeof cuerpo.siguiente === 'string' ? cuerpo.siguiente : null;
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+  const ip = obtenerIp(request.headers);
 
   let config;
   try {
@@ -37,7 +40,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const resultado = await solicitarMagicLink(
     { email, ip, siguiente },
     {
-      limitador,
+      limitadorCorreo,
+      limitadorIp,
       // La URL base viene de NEXT_PUBLIC_APP_URL, nunca del encabezado Host
       // (evita que un atacante haga que el enlace apunte a otro dominio).
       urlCallback: `${config.appUrl}/auth/callback`,
