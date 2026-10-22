@@ -8,6 +8,10 @@
 Envía un mensaje del usuario al asistente y recibe una respuesta generada
 por Google Gemini (ver `docs/decisions/001-gemini-integration.md`).
 
+**Autenticación (TASK 9):** exige sesión (cookies httpOnly del Magic Link). El
+usuario se toma de la **sesión**: si el body trae `usuario_id`, se **ignora**.
+Sin sesión responde `401`.
+
 **Estado actual (TASK 6):** conectado a Gemini real. El historial de
 conversación (si se envía) se pasa completo a Gemini junto con el mensaje
 nuevo. La persistencia en Supabase (guardar la conversación) es TASK 7+,
@@ -18,7 +22,6 @@ historial en cada request mientras tanto.
 
 ```json
 {
-  "usuario_id": "uuid",
   "conversacion_id": "uuid (opcional, se genera uno si no viene)",
   "mensaje": "string (1 a 5000 caracteres)",
   "contexto": { "situacion": "string opcional", "objetivo": "string opcional" },
@@ -26,8 +29,9 @@ historial en cada request mientras tanto.
 }
 ```
 
-Validado con `chatRequestSchema` de `@rcp/shared` (Zod, `.strict()` — campos
-extra rechazan la solicitud).
+Validado con `chatRequestSchema.omit({ usuario_id })` de `@rcp/shared` (Zod,
+`.strict()` — campos extra rechazan la solicitud). Un `usuario_id` en el body
+se descarta antes de validar (compatibilidad con clientes anteriores a TASK 9).
 
 ### Response — 200 OK
 
@@ -45,8 +49,9 @@ extra rechazan la solicitud).
 
 | Código | Causa | Body |
 |---|---|---|
-| 400 | JSON inválido, o no cumple `chatRequestSchema` (mensaje vacío, `usuario_id` no es UUID, etc.) | `{ "error": "...", "detalles"?: [...] }` |
-| 429 | Más de 60 solicitudes en 60 segundos para el mismo `usuario_id` | `{ "error": "Límite de solicitudes excedido..." }` |
+| 400 | JSON inválido, o no cumple el esquema del body (mensaje vacío, historial demasiado largo, etc.; `usuario_id` ya no forma parte del body) | `{ "error": "...", "detalles"?: [...] }` |
+| 401 | Sin sesión válida | `{ "error": "No autenticado" }` |
+| 429 | Más de 60 solicitudes en 60 segundos para el mismo usuario **de la sesión** | `{ "error": "Límite de solicitudes excedido..." }` |
 | 500 | Falta `GEMINI_API_KEY`, Gemini falla (timeout, error de API), o cualquier error inesperado | `{ "error": "Error interno del servidor" }` — **nunca** incluye el detalle real del error (ver issue #9) |
 
 ### Rate limiting
@@ -70,3 +75,41 @@ reinicia, y es evadible sin autenticación real (pendiente TASK 9).
   se antepone como el primer mensaje del array — `@rcp/shared/utils/gemini`
   no expone todavía el campo nativo `systemInstruction` de la API de
   Gemini (deuda técnica anotada en el código).
+
+---
+
+## Autenticación (TASK 9, ADR 004)
+
+Login por **Magic Link** (Supabase Auth). Sin contraseñas.
+
+### POST /api/auth/login
+
+Pide el enlace de ingreso. Body: `{ "email": string, "siguiente"?: string }`
+(`siguiente` es una ruta interna a la que volver tras ingresar; cualquier otra cosa se reemplaza por `/dashboard`).
+
+| Código | Causa | Body |
+|---|---|---|
+| 200 | Solicitud aceptada. **El mensaje es el mismo exista o no el correo**, y también si el envío falla (no revela qué correos están registrados) | `{ "mensaje": "Si el correo es válido, te enviamos un enlace..." }` |
+| 400 | JSON inválido o email con formato inválido | `{ "mensaje": "..." }` |
+| 429 | Más de 5 envíos en 10 minutos al mismo correo (desde cualquier IP) o más de 20 desde la misma IP | `{ "mensaje": "Demasiados intentos..." }` |
+| 500 | Falta configuración de Supabase | `{ "mensaje": "Error interno del servidor." }` |
+
+El enlace apunta a `NEXT_PUBLIC_APP_URL` (nunca al encabezado `Host`). La IP para el límite sale de `x-vercel-forwarded-for` / `x-real-ip`; de `x-forwarded-for` se usa el último valor (el primero lo puede falsificar el cliente).
+
+### GET /auth/callback
+
+Destino del enlace. Canjea `?code=` por una sesión (cookies httpOnly) y redirige
+a `?siguiente=` (solo rutas internas). Con código ausente, vencido o inválido
+redirige a `/auth/login?error=enlace_invalido`.
+
+### Protección de rutas (`src/proxy.ts`)
+
+| Ruta | Sin sesión | Cliente | Consultor / admin |
+|---|---|---|---|
+| `/dashboard/*` | redirige a `/auth/login?siguiente=…` | permitido | permitido |
+| `/dashboard/consultor/*` | redirige al login | **403** | permitido |
+| `/api/chat` | **401** | permitido | permitido |
+| `/api/consultor/*` | **401** | **403** | permitido |
+| Resto (`/`, `/auth/*`, `/ruedadelavida`…) | público | público | público |
+
+Si no se puede leer el rol, se niega el acceso de consultor (falla cerrada).
