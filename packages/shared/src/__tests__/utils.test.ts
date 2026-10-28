@@ -150,12 +150,25 @@ describe('Utils - Security', () => {
 
 describe('Utils - Async', () => {
   describe('delay', () => {
-    it('debe esperar el tiempo especificado', async () => {
-      const start = Date.now();
-      await delay(100);
-      const elapsed = Date.now() - start;
-      expect(elapsed).toBeGreaterThanOrEqual(100);
-      expect(elapsed).toBeLessThan(150);
+    // Con temporizadores simulados: no depende del reloj real ni de qué tan cargada esté la máquina.
+    // La versión anterior medía con Date.now() y exigía entre 100 y 150 ms, y fallaba al azar:
+    // 187 ms con la máquina cargada y 99 ms en GitHub (un temporizador puede adelantarse 1 ms).
+    it('no resuelve antes del tiempo especificado y sí al cumplirse', async () => {
+      vi.useFakeTimers();
+      try {
+        let resuelta = false;
+        void delay(100).then(() => {
+          resuelta = true;
+        });
+
+        await vi.advanceTimersByTimeAsync(99);
+        expect(resuelta).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(resuelta).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
