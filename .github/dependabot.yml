@@ -1,12 +1,9 @@
 # Dependabot — actualizaciones automáticas de dependencias.
 #
-# Por qué existe (2026-10-04): `pnpm audit` del CI falla por GHSA-vfj7-8cjw-p6xm
-# (braces <=3.0.3, sin parche). La vulnerabilidad NO se ignora: se corrige
-# cuando exista una salida real. Hoy llega solo por
-#   eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch > braces
-# Dependabot abre un PR cada semana cuando sale una versión nueva; el CI de ese
-# PR (paso "Auditoría de dependencias") dirá en verde cuándo quedó resuelto.
-# Seguimiento en el vault: "CI rojo en main — advisory braces sin parche".
+# Dependabot abre cada lunes los PR de actualización. Los avisos de seguridad NO se
+# silencian: el paso «Auditoría de dependencias» del CI de cada PR dice si el aviso quedó
+# resuelto. Historia: nació el 2026-10-04 por el aviso de `braces` (retirado por GitHub el
+# 2026-10-23); el CI de `main` volvió a verde el 2026-10-27 con Zod 4 (ADR 005).
 version: 2
 updates:
   - package-ecosystem: "npm" # cubre pnpm (pnpm-lock.yaml y catálogo)
@@ -49,3 +46,10 @@ updates:
       timezone: "America/Santiago"
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      # `init` y `analyze` de CodeQL deben subir juntos a la misma versión: si llegan en PRs
+      # separados, el análisis se rompe al fusionar uno sin el otro (pasó con los PR #34/#35,
+      # #36/#37 y #43/#45).
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
