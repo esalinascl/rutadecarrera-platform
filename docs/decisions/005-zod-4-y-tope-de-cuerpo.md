@@ -1,6 +1,6 @@
 # ADR 005 — Zod 4 y tope de tamaño del cuerpo en `/api/chat`
 
-- **Estado:** propuesta (2026-10-27); pasa a «aceptada» al fusionar el PR
+- **Estado:** aceptada (2026-10-27, al fusionar el PR #48 con el OK de Eduardo)
 - **Decisión origen:** Eduardo aprobó empezar este PR el 2026-10-27 (nota «CI rojo en main — advisory braces sin parche» del vault)
 - **Aviso que lo motiva:** [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) (Zod, severidad alta, CVSS 7.5)
 
