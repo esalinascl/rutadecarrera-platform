@@ -46,8 +46,27 @@ extra rechazan la solicitud).
 | Código | Causa | Body |
 |---|---|---|
 | 400 | JSON inválido, o no cumple `chatRequestSchema` (mensaje vacío, `usuario_id` no es UUID, etc.) | `{ "error": "...", "detalles"?: [...] }` |
+| 413 | El cuerpo supera 512 KB (ver «Tamaño del cuerpo») | `{ "error": "El cuerpo de la solicitud es demasiado grande" }` |
 | 429 | Más de 60 solicitudes en 60 segundos para el mismo `usuario_id` | `{ "error": "Límite de solicitudes excedido..." }` |
 | 500 | Falta `GEMINI_API_KEY`, Gemini falla (timeout, error de API), o cualquier error inesperado | `{ "error": "Error interno del servidor" }` — **nunca** incluye el detalle real del error (ver issue #9) |
+
+### Tamaño del cuerpo
+
+El cuerpo de la solicitud no puede pasar de **512 KB** (`MAX_CUERPO_BYTES` en
+`apps/web/src/lib/http/cuerpo-acotado.ts`); si lo pasa, la respuesta es **413** y
+el cuerpo no se procesa. El máximo legítimo ronda 410 KB (40 turnos de historial ×
+5000 caracteres con acentos). Se cuentan **bytes**, no caracteres, y el límite se
+aplica aunque el cliente no declare `Content-Length` o declare uno falso (ver
+`docs/decisions/005-zod-4-y-tope-de-cuerpo.md`).
+
+### Detalle de los errores de validación (400)
+
+Cada elemento de `detalles` es `{ "campo": "historial.0.role", "mensaje": "...", "tipo": "..." }`.
+Los **mensajes que definimos en español** no cambian. Con Zod 4 cambiaron dos códigos de `tipo`
+(`invalid_string` → `invalid_format` e `invalid_enum_value` → `invalid_value`) y los
+textos por defecto en inglés (por ejemplo, un campo ausente ahora dice
+«Invalid input: expected string, received undefined» en vez de «Required»).
+Quien consuma `detalles` no debe depender de esos textos por defecto.
 
 ### Rate limiting
 

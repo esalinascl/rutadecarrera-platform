@@ -451,4 +451,71 @@ describe('Validation - Helper Functions', () => {
       expect(resultados[1].valido).toBe(true);
     });
   });
+
+  describe('Códigos de error que ve quien llama a /api/chat (`detalles[].tipo`)', () => {
+    // Pruebas de caracterización del paso a Zod 4: dos códigos cambiaron respecto de Zod 3
+    // (`invalid_string` → `invalid_format`, `invalid_enum_value` → `invalid_value`). Los mensajes que
+    // definimos en español no cambian; sí los textos por defecto en inglés.
+    const UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+
+    function tipoDe(datos: unknown, campo: string): string | undefined {
+      const resultado = safeValidate(datos, chatRequestSchema);
+      return resultado.valido ? undefined : resultado.error.find((e) => e.campo === campo)?.tipo;
+    }
+
+    it('un UUID mal formado es `invalid_format`', () => {
+      expect(tipoDe({ usuario_id: 'no-uuid', mensaje: 'x' }, 'usuario_id')).toBe('invalid_format');
+    });
+
+    it('un valor fuera de la lista (rol) es `invalid_value`', () => {
+      const historial = [{ role: 'robot', parts: [{ text: 'a' }] }];
+      expect(tipoDe({ usuario_id: UUID, mensaje: 'x', historial }, 'historial.0.role')).toBe('invalid_value');
+    });
+
+    it('un campo obligatorio que falta es `invalid_type`', () => {
+      expect(tipoDe({ mensaje: 'x' }, 'usuario_id')).toBe('invalid_type');
+    });
+
+    it('los mensajes que definimos en español se conservan', () => {
+      const resultado = safeValidate({ usuario_id: 'no-uuid', mensaje: '' }, chatRequestSchema);
+      expect(resultado.valido).toBe(false);
+      if (!resultado.valido) {
+        const mensajes = resultado.error.map((e) => e.mensaje);
+        expect(mensajes).toContain('ID de usuario debe ser un UUID válido');
+        expect(mensajes).toContain('Mensaje no puede estar vacío');
+      }
+    });
+  });
+
+  describe('Resistencia a arreglos enormes (GHSA-mrhx-c7xc-m3w5, Zod < 4.6.6)', () => {
+    // Con Zod 3.25.76 un arreglo de N elementos inválidos producía N errores (4,2 MB → 2,2 millones de errores,
+    // ~0,9 GB de memoria). Desde 4.6.6 el arreglo se corta casi de inmediato.
+    const UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+
+    it('un historial gigante de elementos inválidos se rechaza con pocos errores (no uno por elemento)', () => {
+      const historial = Array.from({ length: 200_000 }, () => 1);
+
+      const resultado = safeValidate({ usuario_id: UUID, mensaje: 'hola', historial }, chatRequestSchema);
+
+      expect(resultado.valido).toBe(false);
+      if (!resultado.valido) {
+        expect(resultado.error.length).toBeLessThanOrEqual(20);
+      }
+    });
+
+    it('un historial dentro del límite pero con un turno inválido informa solo ese error', () => {
+      const historial = [
+        { role: 'user', parts: [{ text: 'hola' }] },
+        { role: 'model', parts: [] },
+      ];
+
+      const resultado = safeValidate({ usuario_id: UUID, mensaje: 'hola', historial }, chatRequestSchema);
+
+      expect(resultado.valido).toBe(false);
+      if (!resultado.valido) {
+        expect(resultado.error.map((e) => e.campo)).toEqual(['historial.1.parts']);
+      }
+    });
+  });
 });
+

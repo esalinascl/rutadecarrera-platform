@@ -23,7 +23,8 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     ignore:
-      # zod 3 → 4 es un cambio mayor: se migra como tarea planificada, no por PR automático.
+      # Zod ya está en 4 (ADR 005). El siguiente cambio mayor (5) se migra como tarea
+      # planificada, no por PR automático: los menores y parches de la 4 sí llegan solos.
       - dependency-name: "zod"
         update-types: ["version-update:semver-major"]
     groups:
