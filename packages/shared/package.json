@@ -25,11 +25,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite": "^0.5.11",
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "^5.0.1",
+    "@vitest/coverage-v8": "^5.0.5",
     "typescript": "catalog:",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.5"
   },
   "author": "Eduardo Salinas Belletti",
   "license": "MIT"
