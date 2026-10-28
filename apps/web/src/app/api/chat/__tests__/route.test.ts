@@ -269,6 +269,9 @@ describe('POST /api/chat — tope de tamaño del cuerpo (GHSA-mrhx-c7xc-m3w5)', 
     vi.stubEnv('GEMINI_MODEL', 'gemini-3.8-flash');
     callGeminiMock.mockReset();
     callGeminiMock.mockResolvedValue(RESPUESTA_GEMINI_OK);
+    // La sesión simulada se fija aquí: este bloque no debe heredar lo que dejó el anterior.
+    obtenerUsuarioIdMock.mockReset();
+    obtenerUsuarioIdMock.mockResolvedValue(uuidDePrueba());
   });
 
   function crearRequestCrudo(texto: string, encabezados: Record<string, string> = {}): NextRequest {
@@ -314,6 +317,17 @@ describe('POST /api/chat — tope de tamaño del cuerpo (GHSA-mrhx-c7xc-m3w5)', 
     const response = await POST(crearRequestCrudo(cuerpo));
 
     expect(response.status).toBe(413);
+    expect(callGeminiMock).not.toHaveBeenCalled();
+  });
+
+  it('sin sesión responde 401 ANTES de mirar el tamaño: quien no inició sesión no hace que el servidor lea el cuerpo', async () => {
+    obtenerUsuarioIdMock.mockResolvedValue(null);
+
+    // Un cuerpo que, con sesión, daría 413: si el orden se invierte, esta prueba recibe 413 y falla.
+    const response = await POST(crearRequestCrudo(cuerpoDeBytes(LIMITE_BYTES + 1)));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'No autenticado' });
     expect(callGeminiMock).not.toHaveBeenCalled();
   });
 
