@@ -25,7 +25,15 @@ import type {
  * esquema y el tipo divergen (un campo renombrado, una fecha `Date` vs texto),
  * TypeScript no compila. Evita una tercera copia desalineada del modelo.
  */
-type Esquema<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
+type Esquema<T> = z.ZodType<T, unknown>;
+
+/**
+ * Ruta del campo con error como texto, p. ej. `historial.1.parts`.
+ * Se usa `String()` porque en Zod 4 una clave de la ruta puede ser un símbolo, y `.join` lanzaría un error.
+ */
+function rutaComoTexto(ruta: ReadonlyArray<PropertyKey>): string {
+  return ruta.map(String).join('.');
+}
 
 /** Fecha ISO 8601 con zona horaria, como la devuelven Supabase y la API. */
 const fechaIso = z.string().datetime({ offset: true, message: 'Fecha debe estar en formato ISO 8601' });
@@ -210,8 +218,8 @@ export function safeValidate<T>(
     return { valido: true, datos: resultado.data };
   }
 
-  const errores: ValidationError[] = resultado.error.errors.map((err) => ({
-    campo: err.path.join('.'),
+  const errores: ValidationError[] = resultado.error.issues.map((err) => ({
+    campo: rutaComoTexto(err.path),
     mensaje: err.message,
     tipo: err.code,
   }));
@@ -244,8 +252,8 @@ export function parseZodError(error: unknown): ValidationError[] {
     ];
   }
 
-  return error.errors.map((err) => ({
-    campo: err.path.join('.') || 'raíz',
+  return error.issues.map((err) => ({
+    campo: rutaComoTexto(err.path) || 'raíz',
     mensaje: err.message,
     tipo: err.code,
   }));
@@ -270,8 +278,8 @@ export function formatZodError(error: unknown): string {
     return 'Error de validación desconocido';
   }
 
-  const errores = error.errors
-    .map((err) => `${err.path.join('.')}: ${err.message}`)
+  const errores = error.issues
+    .map((err) => `${rutaComoTexto(err.path)}: ${err.message}`)
     .join('\n');
 
   return errores || 'Error de validación desconocido';

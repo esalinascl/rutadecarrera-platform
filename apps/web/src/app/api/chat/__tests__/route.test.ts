@@ -259,3 +259,67 @@ describe('POST /api/chat', () => {
     expect(data.respuesta).toMatch(/\[REDACTED\]/);
   });
 });
+
+describe('POST /api/chat — tope de tamaño del cuerpo (GHSA-mrhx-c7xc-m3w5)', () => {
+  /** Tope acordado: 512 KB. Se repite aquí a propósito: si alguien lo cambia, estas pruebas obligan a decidirlo. */
+  const LIMITE_BYTES = 512 * 1024;
+
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_API_KEY', 'clave-de-prueba-no-real-1234567890');
+    vi.stubEnv('GEMINI_MODEL', 'gemini-3.8-flash');
+    callGeminiMock.mockReset();
+    callGeminiMock.mockResolvedValue(RESPUESTA_GEMINI_OK);
+  });
+
+  function crearRequestCrudo(texto: string, encabezados: Record<string, string> = {}): NextRequest {
+    return new NextRequest('http://localhost:3000/api/chat', {
+      method: 'POST',
+      body: texto,
+      headers: { 'Content-Type': 'application/json', ...encabezados },
+    });
+  }
+
+  /** JSON válido de la petición, rellenado con espacios hasta ocupar exactamente `bytes` bytes. */
+  function cuerpoDeBytes(bytes: number): string {
+    const base = JSON.stringify({ usuario_id: uuidDePrueba(), mensaje: 'Hola' });
+    return base + ' '.repeat(bytes - Buffer.byteLength(base));
+  }
+
+  it('acepta un cuerpo válido que ocupa exactamente el tope', async () => {
+    const response = await POST(crearRequestCrudo(cuerpoDeBytes(LIMITE_BYTES)));
+    expect(response.status).toBe(200);
+  });
+
+  it('rechaza con 413 un cuerpo un byte más grande que el tope, sin llamar a Gemini', async () => {
+    const response = await POST(crearRequestCrudo(cuerpoDeBytes(LIMITE_BYTES + 1)));
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: 'El cuerpo de la solicitud es demasiado grande' });
+    expect(callGeminiMock).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 413 cuando el Content-Length declarado supera el tope (aunque el cuerpo real sea chico)', async () => {
+    const request = crearRequestCrudo(cuerpoDeBytes(100), { 'content-length': String(LIMITE_BYTES + 1) });
+    const response = await POST(request);
+
+    expect(response.status).toBe(413);
+    expect(callGeminiMock).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 413 el ataque de ~4 MB: un historial con millones de elementos inválidos', async () => {
+    const elementos = 2_200_000;
+    const cuerpo = `{"usuario_id":"${uuidDePrueba()}","mensaje":"hola","historial":[${'1,'.repeat(elementos - 1)}1]}`;
+    expect(Buffer.byteLength(cuerpo)).toBeLessThan(4.5 * 1024 * 1024); // cabe en el tope de 4,5 MB de Vercel
+
+    const response = await POST(crearRequestCrudo(cuerpo));
+
+    expect(response.status).toBe(413);
+    expect(callGeminiMock).not.toHaveBeenCalled();
+  });
+
+  it('un cuerpo que no es JSON sigue respondiendo 400 (no 413)', async () => {
+    const response = await POST(crearRequestCrudo('{esto no es json'));
+    expect(response.status).toBe(400);
+  });
+});
+

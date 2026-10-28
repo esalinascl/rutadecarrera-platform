@@ -20,6 +20,7 @@ import {
   type ChatResponse,
   type GeminiMessage,
 } from '@rcp/shared';
+import { leerJsonAcotado } from '../../../lib/http/cuerpo-acotado';
 import { obtenerUsuarioId } from '../../../lib/auth/usuario-sesion';
 
 const RATE_LIMIT_MAX = 60;
@@ -89,16 +90,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   }
 
-  let cuerpo: unknown;
+  // Tope de tamaño ANTES de validar (GHSA-mrhx-c7xc-m3w5): un cuerpo enorme cuesta memoria
+  // y CPU aunque Zod ya esté parchado. Ver lib/http/cuerpo-acotado.ts.
+  const lectura = await leerJsonAcotado(request);
 
-  try {
-    cuerpo = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'JSON inválido en el cuerpo de la solicitud' },
-      { status: 400 },
-    );
+  if (!lectura.ok) {
+    return NextResponse.json({ error: lectura.error }, { status: lectura.estado });
   }
+
+  let cuerpo: unknown = lectura.datos;
 
   // TASK 9: se descarta cualquier `usuario_id` que venga del navegador.
   if (typeof cuerpo === 'object' && cuerpo !== null && !Array.isArray(cuerpo)) {
