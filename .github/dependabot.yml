@@ -24,6 +24,11 @@ updates:
       # planificada, no por PR automático: los menores y parches de la 4 sí llegan solos.
       - dependency-name: "zod"
         update-types: ["version-update:semver-major"]
+      # Los tipos de Node siguen la versión de Node del proyecto (.nvmrc = 24): un salto
+      # mayor (por ejemplo @types/node 26) dejaría usar APIs que no existen en producción.
+      # Los menores y parches de @types/node 24 sí llegan solos.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # Next.js y su config de ESLint se actualizan juntos (misma versión).
       next:
@@ -31,6 +36,14 @@ updates:
           - "next"
           - "eslint-config-next"
           - "@next/*"
+      # React, React DOM y sus tipos suben JUNTOS. Por separado (react sin react-dom, PR #31)
+      # la app se rompe. Va antes de dev-menores para que los tipos queden en este grupo.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
       dev-menores:
         dependency-type: "development"
         update-types:
