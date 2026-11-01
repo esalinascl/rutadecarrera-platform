@@ -4,6 +4,9 @@
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
+    // TypeScript 6 ya no carga solo los tipos de Node: se piden aquí (las pruebas y db/client.ts
+    // usan `process`, `global` y `node:fs`).
+    "types": ["node"],
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

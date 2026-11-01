@@ -1,12 +1,9 @@
 # Dependabot — actualizaciones automáticas de dependencias.
 #
-# Por qué existe (2026-10-04): `pnpm audit` del CI falla por GHSA-vfj7-8cjw-p6xm
-# (braces <=3.0.3, sin parche). La vulnerabilidad NO se ignora: se corrige
-# cuando exista una salida real. Hoy llega solo por
-#   eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch > braces
-# Dependabot abre un PR cada semana cuando sale una versión nueva; el CI de ese
-# PR (paso "Auditoría de dependencias") dirá en verde cuándo quedó resuelto.
-# Seguimiento en el vault: "CI rojo en main — advisory braces sin parche".
+# Dependabot abre cada lunes los PR de actualización. Los avisos de seguridad NO se
+# silencian: el paso «Auditoría de dependencias» del CI de cada PR dice si el aviso quedó
+# resuelto. Historia: nació el 2026-10-04 por el aviso de `braces` (retirado por GitHub el
+# 2026-10-23); el CI de `main` volvió a verde el 2026-10-27 con Zod 4 (ADR 005).
 version: 2
 updates:
   - package-ecosystem: "npm" # cubre pnpm (pnpm-lock.yaml y catálogo)
@@ -27,6 +24,11 @@ updates:
       # planificada, no por PR automático: los menores y parches de la 4 sí llegan solos.
       - dependency-name: "zod"
         update-types: ["version-update:semver-major"]
+      # Los tipos de Node siguen la versión de Node del proyecto (.nvmrc = 24): un salto
+      # mayor (por ejemplo @types/node 26) dejaría usar APIs que no existen en producción.
+      # Los menores y parches de @types/node 24 sí llegan solos.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # Next.js y su config de ESLint se actualizan juntos (misma versión).
       next:
@@ -34,6 +36,14 @@ updates:
           - "next"
           - "eslint-config-next"
           - "@next/*"
+      # React, React DOM y sus tipos suben JUNTOS. Por separado (react sin react-dom, PR #31)
+      # la app se rompe. Va antes de dev-menores para que los tipos queden en este grupo.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
       dev-menores:
         dependency-type: "development"
         update-types:
@@ -49,3 +59,10 @@ updates:
       timezone: "America/Santiago"
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      # `init` y `analyze` de CodeQL deben subir juntos a la misma versión: si llegan en PRs
+      # separados, el análisis se rompe al fusionar uno sin el otro (pasó con los PR #34/#35,
+      # #36/#37 y #43/#45).
+      codeql:
+        patterns:
+          - "github/codeql-action/*"

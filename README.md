@@ -16,7 +16,7 @@ Plataforma integral de empleabilidad y carrera profesional. Un asistente intelig
 
 | Componente | Tecnología |
 |-----------|-----------|
-| **Frontend** | Next.js 16, React 18, TypeScript |
+| **Frontend** | Next.js 16, React 19, TypeScript |
 | **Backend/API** | Next.js API Routes |
 | **IA** | Google Gemini API |
 | **Base de Datos** | PostgreSQL (Supabase), Row Level Security activado |
