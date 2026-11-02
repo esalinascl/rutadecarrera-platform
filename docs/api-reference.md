@@ -89,3 +89,52 @@ reinicia, y es evadible sin autenticación real (pendiente TASK 9).
   se antepone como el primer mensaje del array — `@rcp/shared/utils/gemini`
   no expone todavía el campo nativo `systemInstruction` de la API de
   Gemini (deuda técnica anotada en el código).
+
+---
+
+## GET /api/health
+
+Comprueba que la base de datos (Supabase) responde. Es **público**: lo llama el
+workflow `Monitoring` de GitHub Actions cada 30 minutos, sin credenciales.
+Sirve para dos cosas: avisar por CI si la base cae o se pausa, y mantener
+actividad en el proyecto, porque el plan gratuito de Supabase pausa los
+proyectos con 7 días sin uso (no es una garantía: solo el plan Pro lo es).
+Ver `docs/decisions/006-endpoint-de-salud-de-la-base.md`.
+
+### Request
+
+Sin parámetros ni cuerpo (cualquier parámetro se ignora). Responde a `GET` y
+`HEAD`; los demás métodos reciben 405.
+
+### Response
+
+| Código | Cuándo | Body |
+|---|---|---|
+| 200 | La base respondió a la consulta mínima | `{ "estado": "ok", "revisado_en": "2026-11-02T12:00:00.000Z" }` |
+| 503 | La base devolvió un error, no respondió en 4 s, o falta `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | `{ "estado": "error", "revisado_en": "2026-11-02T12:00:00.000Z" }` |
+
+El body tiene **exactamente** esas dos claves: nunca incluye mensajes de error,
+direcciones, nombres de variables, claves ni datos de la base. La respuesta
+lleva `Cache-Control: no-store`.
+
+### Cómo funciona por dentro
+
+- **Consulta fija de solo lectura:** `select id` con `limit(0)` sobre `usuarios`.
+  La base la ejecuta (comprueba que la tabla y los permisos existen) pero no
+  devuelve ninguna fila. No usa `HEAD`: con `HEAD`, `postgrest-js` trata un 404
+  sin cuerpo (tabla inexistente) como éxito.
+- **Sin reintentos internos** (`retry(false)`): una base inalcanzable debe
+  fallar al instante y con su causa real, no tras esperas de 1, 2 y 4 s.
+- **Tiempo límite de 4 s:** al vencer se cancela la petición en curso.
+- **Caché por instancia:** un resultado `ok` se reutiliza 30 s y un error solo
+  5 s (para que el reintento de Monitoring, 10 s después, consulte de verdad).
+  Las solicitudes simultáneas comparten una sola consulta. Frena el abuso de
+  una ruta pública; no es un límite estricto (cada instancia serverless tiene
+  su propia caché).
+- **Registro:** al fallar escribe en el log del servidor `health_db_error` con
+  solo la `causa` (`configuracion`, `timeout` o `base_de_datos`) y el `codigo`
+  de error de la base si existe; nunca el mensaje completo.
+- **Sin secretos nuevos en GitHub:** la consulta la hace la app con las
+  variables que ya tiene en Vercel.
+- **Con el login (PR #41) fusionado** sigue siendo público: su `proxy.ts` solo
+  cubre `/dashboard`, `/api/chat` y `/api/consultor`.
