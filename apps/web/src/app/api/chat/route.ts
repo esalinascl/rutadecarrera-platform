@@ -3,7 +3,9 @@
  * @description Endpoint de chat del asistente.
  *
  * TASK 5: esqueleto + validación + rate limiting (mock, sin Gemini).
- * TASK 6 (este cambio): conectado a Gemini real vía @rcp/shared/utils/gemini.
+ * TASK 6: conectado a Gemini real vía @rcp/shared/utils/gemini.
+ * TASK 9 (este cambio): el usuario sale de la SESIÓN (cookies), nunca del
+ * body. Un `usuario_id` enviado por el navegador se ignora.
  */
 
 import { randomUUID } from 'crypto';
@@ -19,6 +21,7 @@ import {
   type GeminiMessage,
 } from '@rcp/shared';
 import { leerJsonAcotado } from '../../../lib/http/cuerpo-acotado';
+import { obtenerUsuarioId } from '../../../lib/auth/usuario-sesion';
 
 const RATE_LIMIT_MAX = 60;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -31,9 +34,8 @@ const GEMINI_TIMEOUT_MS = 5_000;
  * ⚠️ Limitaciones conocidas, documentadas en el issue #9:
  * - Se resetea si el proceso se reinicia, y no se comparte entre instancias
  *   serverless concurrentes (no hay Redis en el stack todavía).
- * - `usuario_id` solo se valida como UUID sintáctico, no contra una sesión
- *   real (no hay autenticación todavía, ver TASK 9) — un cliente puede
- *   evadir el límite generando un UUID nuevo por request.
+ * - Desde TASK 9 la clave es el usuario de la sesión (no un valor que mande
+ *   el navegador), así que ya no se puede evadir generando UUID nuevos.
  */
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
@@ -78,7 +80,16 @@ function fusionarTurnosConsecutivos(mensajes: GeminiMessage[]): GeminiMessage[] 
   return fusionados;
 }
 
+/** Esquema del body: igual al de @rcp/shared pero SIN `usuario_id` (sale de la sesión). */
+const chatBodySchema = chatRequestSchema.omit({ usuario_id: true });
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Defensa en profundidad: el proxy ya exige sesión, pero la ruta no confía en ello.
+  const usuario_id = await obtenerUsuarioId();
+  if (!usuario_id) {
+    return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+  }
+
   // Tope de tamaño ANTES de validar (GHSA-mrhx-c7xc-m3w5): un cuerpo enorme cuesta memoria
   // y CPU aunque Zod ya esté parchado. Ver lib/http/cuerpo-acotado.ts.
   const lectura = await leerJsonAcotado(request);
@@ -87,7 +98,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: lectura.error }, { status: lectura.estado });
   }
 
-  const validacion = safeValidate(lectura.datos, chatRequestSchema);
+  let cuerpo: unknown = lectura.datos;
+
+  // TASK 9: se descarta cualquier `usuario_id` que venga del navegador.
+  if (typeof cuerpo === 'object' && cuerpo !== null && !Array.isArray(cuerpo)) {
+    const { usuario_id: _ignorado, ...resto } = cuerpo as Record<string, unknown>;
+    void _ignorado;
+    cuerpo = resto;
+  }
+
+  const validacion = safeValidate(cuerpo, chatBodySchema);
 
   if (!validacion.valido) {
     return NextResponse.json(
@@ -96,7 +116,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { usuario_id, conversacion_id, mensaje, contexto, historial } = validacion.datos;
+  const { conversacion_id, mensaje, contexto, historial } = validacion.datos;
 
   if (!verificarLimite(usuario_id)) {
     return NextResponse.json(
