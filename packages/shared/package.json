@@ -12,6 +12,7 @@
     "./utils": "./src/utils/index.ts",
     "./utils/validation": "./src/utils/validation.ts",
     "./utils/gemini": "./src/utils/gemini.ts",
+    "./utils/creditos": "./src/utils/creditos.ts",
     "./db": "./src/db/index.ts"
   },
   "scripts": {

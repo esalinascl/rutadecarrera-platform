@@ -420,3 +420,4 @@ export function compareStrings(a: string, b: string): boolean {
 // Exports de módulos internos
 export * from './validation';
 export * from './gemini';
+export * from './creditos';
