@@ -16,6 +16,9 @@ export default defineConfig({
         'src/**/*.test.ts',
         'src/app/layout.tsx',
         'src/app/page.tsx',
+        // Presentación pura de la pantalla de ingreso (la lógica está probada en lib/auth y api/auth).
+        'src/app/auth/login/page.tsx',
+        'src/app/auth/login/formulario-login.tsx',
       ],
       // Mínimo exigido por CLAUDE.md (mandato 3).
       thresholds: {
