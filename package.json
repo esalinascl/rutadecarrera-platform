@@ -25,7 +25,7 @@
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "husky": "^9.1.7",
-    "lint-staged": "^17.6.0",
+    "lint-staged": "^17.6.1",
     "prettier": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:"
