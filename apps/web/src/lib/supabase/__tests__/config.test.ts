@@ -67,3 +67,40 @@ describe('leerConfigPublica', () => {
     ).toBe(jwt);
   });
 });
+
+describe('leerConfigPublica — URL de la app en las previews de Vercel', () => {
+  const base = { NEXT_PUBLIC_SUPABASE_URL: 'https://x.supabase.co', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon' };
+
+  it('en una preview sin NEXT_PUBLIC_APP_URL usa la URL estable de la rama que pone Vercel', () => {
+    expect(
+      leerConfigPublica({ ...base, VERCEL_ENV: 'preview', VERCEL_BRANCH_URL: 'rdc-git-feat-x-equipo.vercel.app' }).appUrl,
+    ).toBe('https://rdc-git-feat-x-equipo.vercel.app');
+  });
+
+  it('si NEXT_PUBLIC_APP_URL existe, manda ella también en la preview', () => {
+    expect(
+      leerConfigPublica({
+        ...base,
+        NEXT_PUBLIC_APP_URL: 'https://fija.ejemplo.cl',
+        VERCEL_ENV: 'preview',
+        VERCEL_BRANCH_URL: 'rama.vercel.app',
+      }).appUrl,
+    ).toBe('https://fija.ejemplo.cl');
+  });
+
+  it('en producción NUNCA usa la URL de rama: exige NEXT_PUBLIC_APP_URL', () => {
+    expect(() =>
+      leerConfigPublica({ ...base, VERCEL_ENV: 'production', VERCEL_BRANCH_URL: 'rama.vercel.app' }),
+    ).toThrow(/NEXT_PUBLIC_APP_URL/);
+  });
+
+  it('fuera de Vercel tampoco hay respaldo', () => {
+    expect(() => leerConfigPublica({ ...base, VERCEL_BRANCH_URL: 'rama.vercel.app' })).toThrow(/NEXT_PUBLIC_APP_URL/);
+  });
+
+  it('rechaza una URL de rama que no sea un nombre de host simple', () => {
+    expect(() =>
+      leerConfigPublica({ ...base, VERCEL_ENV: 'preview', VERCEL_BRANCH_URL: 'malo.com/ruta?x=1' }),
+    ).toThrow(/NEXT_PUBLIC_APP_URL/);
+  });
+});
