@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { SiteNav } from '../components/site-nav';
 
 export const metadata: Metadata = {
-  title: 'Asistente de Empleabilidad — Ruta de Carrera',
-  description: 'Asistente de IA para coaching de transición profesional',
+  title: 'Ruta de Carrera',
+  description: 'La ruta hacia una mejor etapa laboral: método, herramientas y una red de consultores de carrera.',
 };
 
 export default function RootLayout({

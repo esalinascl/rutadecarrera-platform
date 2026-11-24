@@ -10,7 +10,7 @@
  * quita o renombra una columna en un solo lado, el test falla.
  */
 
-import type { Analysis, Conversation, Message, User } from '../types';
+import type { Analysis, CodigoDisc, Conversation, Message, User } from '../types';
 
 // ============================================================================
 // COLUMNAS POR TABLA (verificadas contra el SQL en los tests)
@@ -60,6 +60,7 @@ export const COLUMNAS_POR_TABLA = {
     'creado_en',
   ]),
   analisis: columnas<Analysis>()(['id', 'usuario_id', 'tipo', 'resultado', 'creado_en']),
+  codigos_disc: columnas<CodigoDisc>()(['usuario_id', 'codigo', 'asignado_en']),
 } as const;
 
 export type NombreTabla = keyof typeof COLUMNAS_POR_TABLA;

@@ -39,7 +39,7 @@ describe('GET /auth/callback', () => {
     exchangeCodeForSession.mockResolvedValue({ error: null });
     const respuesta = await GET(pedir('?code=abc&siguiente=https%3A%2F%2Fmalo.example'));
 
-    expect(respuesta.headers.get('location')).toBe('https://app.ejemplo.cl/dashboard');
+    expect(respuesta.headers.get('location')).toBe('https://app.ejemplo.cl/red');
   });
 
   it('sin código vuelve al login con error', async () => {

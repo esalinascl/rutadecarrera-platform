@@ -39,7 +39,7 @@ describe('POST /api/auth/login', () => {
       email: 'ana@correo.cl',
       options: {
         emailRedirectTo: 'https://app.ejemplo.cl/auth/callback?siguiente=%2Fdashboard%2Fasistente',
-        shouldCreateUser: true,
+        shouldCreateUser: false,
       },
     });
   });

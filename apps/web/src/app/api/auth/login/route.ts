@@ -48,7 +48,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       enviarOtp: (correo, urlRedireccion) =>
         supabase.auth.signInWithOtp({
           email: correo,
-          options: { emailRedirectTo: urlRedireccion, shouldCreateUser: true },
+          // Registro cerrado (SPEC web de la Red, R2.1): solo entran las cuentas dadas
+          // de alta desde la lista aprobada. La respuesta sigue siendo neutra (R2.2).
+          options: { emailRedirectTo: urlRedireccion, shouldCreateUser: false },
         }),
     },
   );

@@ -13,6 +13,7 @@ export default async function PaginaLogin({
   return (
     <main style={{ maxWidth: 420, margin: '48px auto', padding: '0 24px' }}>
       <h1>Ingresar</h1>
+      <p>Acceso para los miembros de la Red Ruta de Carrera.</p>
       <p>Te enviaremos un enlace a tu correo. No necesitas contraseña.</p>
       {error === 'enlace_invalido' && (
         <p role="alert">El enlace no es válido o ya venció. Pide uno nuevo.</p>

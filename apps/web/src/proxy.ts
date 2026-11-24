@@ -9,20 +9,11 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { decidirAcceso, type Rol } from './lib/auth/acceso';
+import { decidirAcceso, esRuta, requiereRol, type Rol } from './lib/auth/acceso';
 import { leerConfigPublica } from './lib/supabase/config';
 import { opcionesCookie } from './lib/supabase/cookies';
 
 const ROLES_VALIDOS: readonly string[] = ['cliente', 'consultor', 'admin'];
-
-function esRutaConsultor(pathname: string): boolean {
-  return (
-    pathname === '/dashboard/consultor' ||
-    pathname.startsWith('/dashboard/consultor/') ||
-    pathname === '/api/consultor' ||
-    pathname.startsWith('/api/consultor/')
-  );
-}
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
@@ -57,15 +48,15 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   let rol: Rol | null = null;
   if (usuario) {
     rol = 'cliente';
-    // El rol solo se consulta donde importa (rutas de consultor).
-    if (esRutaConsultor(pathname)) {
+    // El rol solo se consulta donde importa (área de miembros y API de consultor).
+    if (requiereRol(pathname)) {
       const { data: fila, error } = await supabase
         .from('usuarios')
         .select('rol')
         .eq('id', usuario.id)
         .maybeSingle();
       if (error || !fila || !ROLES_VALIDOS.includes(fila.rol)) {
-        // Falla cerrada: sin rol confirmado no hay acceso de consultor.
+        // Falla cerrada: sin rol confirmado no hay acceso de miembro.
         if (error) console.error('No se pudo leer el rol del usuario:', error.message);
         rol = 'cliente';
       } else {
@@ -101,14 +92,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 /** Rutas que exigen consultar la sesión (las mismas que protege `decidirAcceso`). */
 function requiereSesion(pathname: string): boolean {
   return (
-    pathname === '/dashboard' ||
-    pathname.startsWith('/dashboard/') ||
-    pathname === '/api/chat' ||
-    esRutaConsultor(pathname)
+    esRuta(pathname, '/dashboard') ||
+    esRuta(pathname, '/red') ||
+    esRuta(pathname, '/api/chat') ||
+    esRuta(pathname, '/api/consultor')
   );
 }
 
 export const config = {
   // Solo las rutas protegidas: no se ejecuta en estáticos ni en páginas públicas.
-  matcher: ['/dashboard/:path*', '/api/chat', '/api/consultor/:path*'],
+  matcher: ['/dashboard/:path*', '/red/:path*', '/api/chat', '/api/consultor/:path*'],
 };

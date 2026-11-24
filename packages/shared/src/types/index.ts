@@ -52,6 +52,16 @@ export interface User {
 }
 
 /**
+ * Código DISC asignado a un miembro de la Red (migración 004).
+ * Solo el sistema lo crea o cambia; el miembro solo puede leer el suyo.
+ */
+export interface CodigoDisc {
+  usuario_id: string;
+  codigo: string;
+  asignado_en: IsoDateString;
+}
+
+/**
  * Contexto inicial proporcionado por el usuario
  * Se utiliza para personalizar las respuestas de Gemini
  */

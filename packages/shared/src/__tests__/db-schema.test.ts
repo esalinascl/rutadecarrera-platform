@@ -71,15 +71,18 @@ describe('Esquema SQL ↔ tipos TypeScript', () => {
     expect(sql).not.toMatch(/\bTIMESTAMP\b(?!TZ)/);
   });
 
-  it('activa Row Level Security en todas las tablas', () => {
+  it('activa Row Level Security en todas las tablas (en cualquier migración)', () => {
+    const todas = migraciones.join('\n');
     for (const tabla of tablasTs) {
-      expect(sql).toContain(`ALTER TABLE ${tabla}`);
-      expect(sql).toMatch(new RegExp(`ALTER TABLE ${tabla}\\s+ENABLE ROW LEVEL SECURITY`));
+      expect(todas).toMatch(new RegExp(`ALTER TABLE ${tabla}\\s+ENABLE ROW LEVEL SECURITY`));
     }
   });
 
-  it('es repetible (todas las tablas e índices usan IF NOT EXISTS)', () => {
-    expect(sql).not.toMatch(/CREATE TABLE (?!IF NOT EXISTS)/);
-    expect(sql).not.toMatch(/CREATE INDEX (?!IF NOT EXISTS)/);
-  });
+  it.each(migraciones.map((texto, i) => [i + 1, texto] as const))(
+    'la migración n.º %i es repetible (tablas e índices con IF NOT EXISTS)',
+    (_n, texto) => {
+      expect(texto).not.toMatch(/CREATE TABLE (?!IF NOT EXISTS)/);
+      expect(texto).not.toMatch(/CREATE (UNIQUE )?INDEX (?!IF NOT EXISTS)/);
+    },
+  );
 });

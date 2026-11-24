@@ -28,10 +28,14 @@ export function SiteNav() {
               {HERRAMIENTAS.map((h) => (
                 <li key={h.href} style={{ padding: '4px 0' }}>
                   <a href={h.href}>{h.nombre}</a>
+                  {h.soloMiembros ? <small style={{ marginLeft: 8, color: '#666' }}>Solo miembros</small> : null}
                 </li>
               ))}
             </ul>
           </details>
+        </li>
+        <li style={{ marginLeft: 'auto' }}>
+          <a href="/red">Área de miembros</a>
         </li>
       </ul>
     </nav>
