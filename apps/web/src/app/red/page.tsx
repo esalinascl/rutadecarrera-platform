@@ -1,6 +1,9 @@
 import { HERRAMIENTAS } from '../../lib/herramientas';
 import { exigirMiembro } from '../../lib/red/exigir-miembro';
 
+// Depende de la sesión del usuario: nunca se genera al compilar.
+export const dynamic = 'force-dynamic';
+
 export const metadata = { title: 'Área de miembros — Ruta de Carrera' };
 
 /** Portada del área de miembros de la Red (SPEC web de la Red, R3.4 y R3.5). */

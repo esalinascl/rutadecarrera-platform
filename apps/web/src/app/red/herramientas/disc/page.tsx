@@ -3,6 +3,9 @@ import { exigirMiembro } from '../../../../lib/red/exigir-miembro';
 import { leerCodigoDisc } from '../../../../lib/red/miembro';
 import { crearDependenciasMiembro } from '../../../../lib/red/supabase-miembro';
 
+// Depende de la sesión del usuario: nunca se genera al compilar.
+export const dynamic = 'force-dynamic';
+
 export const metadata = { title: 'Test DISC — Área de miembros' };
 
 /** Herramientas → DISC del miembro (SPEC web de la Red, R5). El test DISC no se toca. */
