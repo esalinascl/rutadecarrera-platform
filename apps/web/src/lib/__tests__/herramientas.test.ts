@@ -1,20 +1,31 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HERRAMIENTAS } from '../herramientas';
+import { HERRAMIENTAS, URL_TEST_DISC } from '../herramientas';
 
 describe('HERRAMIENTAS', () => {
-  it('incluye la Rueda de la Vida en /ruedadelavida', () => {
-    const rueda = HERRAMIENTAS.find((h) => h.nombre === 'Rueda de la Vida');
-    expect(rueda).toBeDefined();
-    expect(rueda?.href).toBe('/ruedadelavida');
-    expect(rueda?.externa).toBe(false);
+  it('el Test DISC es la primera herramienta (R4.1)', () => {
+    expect(HERRAMIENTAS[0]?.nombre).toBe('Test DISC');
   });
 
-  it('incluye DISC como enlace externo a su subdominio', () => {
+  it('el DISC lleva a su página del área de miembros, interna y solo para miembros (R4.2)', () => {
     const disc = HERRAMIENTAS.find((h) => h.nombre === 'Test DISC');
-    expect(disc?.href).toBe('https://disc.rutadecarrera.com');
-    expect(disc?.externa).toBe(true);
+    expect(disc?.href).toBe('/red/herramientas/disc');
+    expect(disc?.externa).toBe(false);
+    expect(disc?.soloMiembros).toBe(true);
+  });
+
+  it('la Rueda de la Vida sigue pública en /ruedadelavida (R4.4)', () => {
+    const rueda = HERRAMIENTAS.find((h) => h.nombre === 'Rueda de la Vida');
+    expect(rueda?.href).toBe('/ruedadelavida');
+    expect(rueda?.externa).toBe(false);
+    expect(rueda?.soloMiembros).toBe(false);
+  });
+
+  it('las herramientas solo para miembros viven bajo /red', () => {
+    for (const h of HERRAMIENTAS.filter((x) => x.soloMiembros)) {
+      expect(h.href.startsWith('/red/')).toBe(true);
+    }
   });
 
   it('no repite rutas', () => {
@@ -26,6 +37,10 @@ describe('HERRAMIENTAS', () => {
     for (const h of HERRAMIENTAS) {
       expect(h.externa ? h.href.startsWith('https://') : h.href.startsWith('/')).toBe(true);
     }
+  });
+
+  it('la dirección pública del test DISC es https y del subdominio disc', () => {
+    expect(URL_TEST_DISC).toBe('https://disc.rutadecarrera.com');
   });
 });
 

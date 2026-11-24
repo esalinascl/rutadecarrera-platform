@@ -25,6 +25,21 @@ function esClaveSecreta(clave: string): boolean {
   }
 }
 
+/** Nombre de host simple (sin protocolo, ruta ni query), como el que entrega Vercel. */
+const PATRON_HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+
+/**
+ * Respaldo SOLO para las previews de Vercel: la URL estable de la rama
+ * (`VERCEL_BRANCH_URL`), que la pone Vercel y no quien hace la petición (no
+ * es el encabezado Host). En producción y fuera de Vercel no hay respaldo:
+ * `NEXT_PUBLIC_APP_URL` es obligatoria.
+ */
+function urlDePreview(env: Record<string, string | undefined>): string | undefined {
+  const host = env.VERCEL_BRANCH_URL;
+  if (env.VERCEL_ENV !== 'preview' || !host || !PATRON_HOST.test(host)) return undefined;
+  return `https://${host}`;
+}
+
 /**
  * Lee la configuración desde variables de entorno.
  * @throws Error en español si falta alguna variable o si la clave es secreta.
@@ -34,7 +49,7 @@ export function leerConfigPublica(
 ): ConfigPublicaSupabase {
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const appUrl = env.NEXT_PUBLIC_APP_URL;
+  const appUrl = env.NEXT_PUBLIC_APP_URL || urlDePreview(env);
 
   for (const [nombre, valor] of [
     ['NEXT_PUBLIC_SUPABASE_URL', url],

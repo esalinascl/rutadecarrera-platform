@@ -58,32 +58,48 @@ describe('proxy', () => {
     expect(await respuesta.json()).toEqual({ error: 'No autenticado' });
   });
 
-  it('un cliente en /dashboard/consultor recibe 403', async () => {
+  it('un cliente en /red va a la página «solo miembros» (R3.2)', async () => {
     getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
     maybeSingle.mockResolvedValue({ data: { rol: 'cliente' }, error: null });
-    const respuesta = await proxy(pedir('/dashboard/consultor'));
-    expect(respuesta.status).toBe(403);
+    const respuesta = await proxy(pedir('/red'));
+    expect(respuesta.status).toBe(307);
+    expect(respuesta.headers.get('location')).toBe('http://localhost:3000/sin-acceso');
   });
 
-  it('un consultor entra a /dashboard/consultor', async () => {
+  it('un consultor entra a /red/herramientas/disc', async () => {
     getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
     maybeSingle.mockResolvedValue({ data: { rol: 'consultor' }, error: null });
-    const respuesta = await proxy(pedir('/dashboard/consultor'));
+    const respuesta = await proxy(pedir('/red/herramientas/disc'));
     expect(respuesta.status).toBe(200);
   });
 
-  it('si no se puede leer el rol, niega el acceso de consultor (falla cerrada)', async () => {
+  it('si no se puede leer el rol, niega el área de miembros (falla cerrada, R3.3)', async () => {
     getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
     maybeSingle.mockResolvedValue({ data: null, error: { message: 'fallo' } });
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const respuesta = await proxy(pedir('/dashboard/consultor'));
-    expect(respuesta.status).toBe(403);
+    const respuesta = await proxy(pedir('/red'));
+    expect(respuesta.headers.get('location')).toBe('http://localhost:3000/sin-acceso');
     error.mockRestore();
   });
 
-  it('un cliente con sesión entra a /dashboard sin consultar su rol', async () => {
+  it('un rol desconocido en la base no entra a /red', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
+    maybeSingle.mockResolvedValue({ data: { rol: 'superadmin' }, error: null });
+    const respuesta = await proxy(pedir('/red'));
+    expect(respuesta.headers.get('location')).toBe('http://localhost:3000/sin-acceso');
+  });
+
+  it('con sesión, /dashboard lleva a /red sin consultar el rol (R3.6)', async () => {
     getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
     const respuesta = await proxy(pedir('/dashboard'));
+    expect(respuesta.status).toBe(307);
+    expect(respuesta.headers.get('location')).toBe('http://localhost:3000/red');
+    expect(maybeSingle).not.toHaveBeenCalled();
+  });
+
+  it('un cliente con sesión entra a /dashboard/asistente sin consultar su rol', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
+    const respuesta = await proxy(pedir('/dashboard/asistente'));
     expect(respuesta.status).toBe(200);
     expect(maybeSingle).not.toHaveBeenCalled();
   });
@@ -100,7 +116,7 @@ describe('proxy', () => {
       return { data: { user: { id: 'u1' } }, error: null };
     });
 
-    const respuesta = await proxy(pedir('/dashboard'));
+    const respuesta = await proxy(pedir('/dashboard/asistente'));
 
     expect(respuesta.cookies.get('sb-token')?.value).toBe('renovado');
   });
@@ -140,7 +156,7 @@ describe('proxy', () => {
 
   it('reenvía los encabezados anti-caché que entrega Supabase (evita que un CDN sirva el token a otro)', async () => {
     simularRenovacion({ id: 'u1' });
-    const respuesta = await proxy(pedir('/dashboard'));
+    const respuesta = await proxy(pedir('/dashboard/asistente'));
 
     expect(respuesta.headers.get('cache-control')).toBe('private, no-store');
     expect(respuesta.headers.get('pragma')).toBe('no-cache');
@@ -182,8 +198,19 @@ describe('matcher del proxy', () => {
     '/api/chat',
     '/api/consultor',
     '/api/consultor/saldo',
+    '/red',
+    '/red/herramientas/disc',
   ];
-  const publicas = ['/', '/auth/login', '/auth/callback', '/api/auth/login', '/ruedadelavida', '/dashboardx'];
+  const publicas = [
+    '/',
+    '/auth/login',
+    '/auth/callback',
+    '/api/auth/login',
+    '/ruedadelavida',
+    '/dashboardx',
+    '/sin-acceso',
+    '/redes',
+  ];
 
   it.each(protegidas)('%s está cubierta por el matcher Y exige acceso (las dos listas coinciden)', (ruta) => {
     expect(decidirAcceso({ pathname: ruta, rol: null }).tipo).not.toBe('permitir');

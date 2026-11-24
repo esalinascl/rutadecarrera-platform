@@ -82,10 +82,10 @@ describe('solicitarMagicLink', () => {
     expect(deps.enviarOtp).toHaveBeenCalledTimes(3);
   });
 
-  it('un `siguiente` externo se reemplaza por /dashboard (sin redirección abierta)', async () => {
+  it('un `siguiente` externo se reemplaza por /red (sin redirección abierta)', async () => {
     const deps = crearDeps();
     await solicitarMagicLink({ email: 'ana@correo.cl', ip: null, siguiente: 'https://malo.example' }, deps);
 
-    expect(deps.enviarOtp).toHaveBeenCalledWith('ana@correo.cl', 'https://app.ejemplo.cl/auth/callback?siguiente=%2Fdashboard');
+    expect(deps.enviarOtp).toHaveBeenCalledWith('ana@correo.cl', 'https://app.ejemplo.cl/auth/callback?siguiente=%2Fred');
   });
 });
