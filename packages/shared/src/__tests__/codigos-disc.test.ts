@@ -133,6 +133,20 @@ describe('codigos_disc — integridad', () => {
 });
 
 describe('migración 004', () => {
+  it('la reversa quita la tabla sin tocar la 003, y la 004 se puede volver a aplicar', async () => {
+    await aplicarComoMigrador(db, leerMigracion('reversas/004_codigos_disc_reversa.sql'));
+    const { rows: tabla } = await comoIdentidad(db, sistema, "SELECT to_regclass('public.codigos_disc') AS t");
+    expect(tabla).toEqual([{ t: null }]);
+    const { rows: usuarios } = await comoIdentidad(db, sistema, 'SELECT count(*)::int AS n FROM usuarios');
+    expect(usuarios).toEqual([{ n: 2 }]);
+    // La reversa también es repetible.
+    await aplicarComoMigrador(db, leerMigracion('reversas/004_codigos_disc_reversa.sql'));
+    await aplicarComoMigrador(db, leerMigracion('004_codigos_disc.sql'));
+    const { rows } = await comoIdentidad(db, sistema, 'SELECT count(*)::int AS n FROM codigos_disc');
+    expect(rows).toEqual([{ n: 0 }]);
+  });
+
+
   it('es repetible: aplicarla dos veces no falla ni duplica datos', async () => {
     await aplicarComoMigrador(db, leerMigracion('004_codigos_disc.sql'));
     const { rows } = await comoIdentidad(db, sistema, 'SELECT count(*)::int AS n FROM codigos_disc');
